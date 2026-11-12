@@ -137,7 +137,7 @@ export function createLacrosse(THREE, ctx) {
       let tx = st.shadow + Math.sin(st.t * 1.7) * 0.06, ty = 1.15;
       const lead = st.balls.find(b => b.live && b.v.z < 0 && st.t - b.born > 0.11);
       if (lead) { const p = lead.m.position, k = -p.z / lead.v.z; tx = clamp(p.x + lead.v.x * k, -HW + 0.25, HW - 0.25); ty = clamp(p.y + lead.v.y * k - 4.9 * k * k, 0.35, 1.7); }
-      const gs = (1.1 + st.goals * 0.07) * dt;
+      const gs = (1.045 + st.goals * 0.066) * dt;
       st.gx += clamp(tx - st.gx, -gs, gs); st.gy += clamp(ty - st.gy, -2.4 * dt, 2.4 * dt);
       if (lead) st.side = tx > st.gx ? 1 : -1;
       goalie.position.x = st.gx; goalie.rotation.y = st.th * 0.6;
@@ -154,8 +154,8 @@ export function createLacrosse(THREE, ctx) {
           const inside = Math.abs(x) < HW - 0.05 && y < G - 0.05 && y > 0;
           const onPipe = (Math.abs(Math.abs(x) - HW) < 0.11 && y < G + 0.1) || (Math.abs(y - G) < 0.11 && Math.abs(x) < HW + 0.1);
           if (inside) {
-            const gwx = st.gx + hx + st.side * 0.07, body = Math.abs(x - st.gx) < 0.27 && y < 1.78;
-            const stickSave = Math.hypot(x - gwx, y - hy) < 0.23;
+            const gwx = st.gx + hx + st.side * 0.07, body = Math.abs(x - st.gx) < 0.2565 && y < 1.78;
+            const stickSave = Math.hypot(x - gwx, y - hy) < 0.2185;
             if (body || stickSave) { say(stickSave ? 'Stick save!' : 'Saved!', st.streak > 1 ? 'Streak over' : ''); st.streak = 0; b.v.set((x - st.gx) * 5 + rand(-1, 1), 2.5, 5); p.z = 0.08; }
             else {
               const corner = Math.abs(x) > HW - 0.5 && (y > G - 0.5 || y < 0.5);
@@ -286,7 +286,8 @@ export function createRocket(THREE, ctx, opt = {}) {
   const boom = add(new THREE.SphereGeometry(1, 18, 14), new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true }), 0, 0, 0); boom.visible = false;
 
   const BURN = 100 / V.burnT;
-  const st = { x: V.launchX, y: DECK + 0.3, vx: 0, vy: 0, th: 0, om: 0, fuel: 100, hold: false, phase: 'pad', endT: 0, result: null, t: 0, sepE: 0, sepT: 0, s2: null, msg: '', msgT: 0, maxAlt: 0 };
+  const WIND0 = (Math.random() < 0.5 ? -1 : 1) * rand(3, 9) * (V.tower ? 0.6 : 1), GUST = rand(1, 3) * (V.tower ? 0.6 : 1), WPH = rand(0, 6.28);
+  const st = { wind: WIND0, x: V.launchX, y: DECK + 0.3, vx: 0, vy: 0, th: 0, om: 0, fuel: 100, hold: false, phase: 'pad', endT: 0, result: null, t: 0, sepE: 0, sepT: 0, s2: null, msg: '', msgT: 0, maxAlt: 0 };
   const GROUND = DECK + 0.3;
   function end(ok, text, score) {
     st.phase = ok ? 'landed' : 'crashed'; st.endT = 1.6;
@@ -311,6 +312,7 @@ export function createRocket(THREE, ctx, opt = {}) {
     up() { st.hold = false; },
     update(dt) {
       st.t += dt; st.msgT -= dt;
+      st.wind = WIND0 + GUST * Math.sin(st.t * 0.45 + WPH);
       const { f, s } = ctx.axes();
       let thrust = false;
       const flying = st.phase === 'pad' || st.phase === 'ascent' || st.phase === 'descent';
@@ -320,8 +322,9 @@ export function createRocket(THREE, ctx, opt = {}) {
         if (st.phase === 'pad' && thrust) st.phase = 'ascent';
         if (st.phase !== 'pad') {
           st.om += -s * V.rot * dt; st.om *= 1 - 1.5 * dt; st.th += st.om * dt;
-          const a = thrust ? V.AT : 0, sp = Math.hypot(st.vx, st.vy);
-          st.vx += (-Math.sin(st.th) * a - V.k * st.vx * sp) * dt; st.vy += (Math.cos(st.th) * a - G0 - V.k * st.vy * sp) * dt;
+          // drag acts on velocity relative to the moving air, so wind pushes the vehicle sideways
+          const a = thrust ? V.AT : 0, rvx = st.vx - st.wind, sp = Math.hypot(rvx, st.vy);
+          st.vx += (-Math.sin(st.th) * a - V.k * rvx * sp) * dt; st.vy += (Math.cos(st.th) * a - G0 - V.k * st.vy * sp) * dt;
           st.x += st.vx * dt; st.y += st.vy * dt; st.maxAlt = Math.max(st.maxAlt, st.y);
           if (thrust) st.fuel = Math.max(0, st.fuel - BURN * dt);
           if (st.phase === 'ascent' && st.fuel <= 0) { separate(); if (st.phase === 'ascent') end(false, 'Out of fuel before separation.', 0); }
@@ -371,9 +374,11 @@ export function createRocket(THREE, ctx, opt = {}) {
         top = `<div class="g-top" style="flex-direction:column;align-items:center;gap:6px">
           <div class="pill">${V.name} · Stage 2 orbit <b>${km(Math.max(0, E))} km</b> · target ${km(E_MIN)}–${km(E_MAX)} km</div>
           <div class="g-band"><span style="left:${a}%;width:${b - a}%"></span><i style="left:${pct}%"></i></div>
-          <div class="pill ${state[1]}">${st.phase === 'pad' ? (ctx.touch ? 'Push the stick up to launch' : 'Hold W to launch') : state[0]}</div></div>`;
+          <div class="pill ${state[1]}">${st.phase === 'pad' ? (ctx.touch ? 'Push the stick up to launch' : 'Hold W or ↑ to launch') : state[0]}</div></div>`;
       } else top = `<div class="g-top"><div class="pill">${V.name}</div><div class="pill">Stage 2: ${km(st.sepE)} km ${st.sepE >= E_MIN ? '✓' : '✗'}</div><div class="pill">Target ${(V.padX - st.x >= 0 ? '→ ' : '← ') + Math.abs(V.padX - st.x).toFixed(0)} m</div></div>`;
+      const wa = Math.abs(st.wind), arrows = (st.wind > 0 ? '→' : '←').repeat(wa > 7 ? 3 : wa > 4 ? 2 : 1);
       ctx.hud(`${exitHint}${top}
+        <div class="g-wind">WIND <b>${arrows} ${wa.toFixed(0)} m/s</b></div>
         <div class="g-side">
           ALT &nbsp;&nbsp;${alt.toFixed(0).padStart(6)} m<br>
           V-SPD ${st.vy.toFixed(1).padStart(6)} m/s<br>
@@ -383,13 +388,13 @@ export function createRocket(THREE, ctx, opt = {}) {
           FUEL &nbsp;${st.fuel.toFixed(0).padStart(6)}%
         </div>
         <div class="g-plaque"><b>Flight plaque · ${V.name}</b><br>
-          a = (T/m)·n̂ − g·ŷ − k·|v|·v &nbsp; T/m = ${V.AT}, k = ${V.k}<br>
+          a = (T/m)·n̂ − g·ŷ − k·|v−w|·(v−w) &nbsp; T/m = ${V.AT}, k = ${V.k}, w = wind<br>
           terminal velocity v<sub>t</sub> = √(g/k) ≈ ${Math.sqrt(G0 / V.k).toFixed(0)} m/s<br>
           stop height h = v² / (2·(T/m − g)): burn when ALT ≈ BURN@<br>
           land: |v<sub>y</sub>| &lt; ${V.vyMax}, |v<sub>x</sub>| &lt; 3.5, tilt &lt; ${V.tiltMax}°, within ${V.padW} m</div>
         ${st.phase === 'landed' ? `<div class="g-msg">${V.tower ? 'Caught by the tower.' : 'The booster has landed.'}</div>` : st.phase === 'crashed' ? '<div class="g-msg">Rapid unscheduled disassembly</div>'
           : st.msgT > 0 ? `<div class="g-msg" style="font-size:22px">${st.msg}</div>`
-          : st.phase === 'ascent' && st.t < 6 ? `<div class="g-msg" style="font-size:20px">${ctx.touch ? 'Stick up to burn · left/right to tilt · SEPARATE in the window' : 'W burn · A/D tilt · Space or click to separate'}<small>Every second you burn going up is fuel you will not have coming down.</small></div>` : ''}
+          : st.phase === 'ascent' && st.t < 6 ? `<div class="g-msg" style="font-size:20px">${ctx.touch ? 'Stick up to burn · left/right to tilt · SEPARATE in the window' : 'W/↑ burn · A/D or ←/→ tilt · Space or click to separate'}<small>Every second you burn going up is fuel you will not have coming down.</small></div>` : ''}
         <div class="g-bar" style="top:auto;bottom:22px"><i style="width:${st.fuel}%;background:${st.fuel < 30 ? '#e5544b' : '#f2b441'}"></i></div>`);
     },
   };
@@ -581,7 +586,7 @@ export function createParkour(THREE, ctx) {
       const prog = clamp(-st.z / (N * D), 0, 1), shown = Math.max(0, st.time - st.bonus);
       ctx.hud(`${exitHint}<div class="g-top"><div class="pill">⏱ ${shown.toFixed(2)}s</div>${tick}${st.boost > 0 ? '<div class="pill up">BULL RUN</div>' : ''}${st.shield ? '<div class="pill" style="color:#5aa9ff">HEDGED</div>' : ''}</div>
         ${st.msgT > 0 ? `<div class="g-msg">${st.msg}</div>` : alert ? `<div class="g-msg" style="font-size:22px;color:#ffd23f">⚠ ${alert}</div>`
-          : (!st.started ? `<div class="g-msg" style="font-size:22px">${ctx.touch ? 'Run the charts · JUMP between bars' : 'WASD to run · Space to jump · reach the closing bell'}<small>Yellow bars are about to crash or spike. Change lanes. Dodge the bears.</small></div>` : '')}
+          : (!st.started ? `<div class="g-msg" style="font-size:22px">${ctx.touch ? 'Run the charts · JUMP between bars' : 'WASD or arrows to run · Space to jump · reach the closing bell'}<small>Yellow bars are about to crash or spike. Change lanes. Dodge the bears.</small></div>` : '')}
         <div class="g-bar"><i style="width:${Math.round(prog * 100)}%;background:#35c27a"></i></div>`);
     },
   };

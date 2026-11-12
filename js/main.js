@@ -323,14 +323,33 @@ function tombstone(parent, name, x, y, z, s) {
   col(33.4, 4.9, 0.5, 0.5);
   interact(mb, 'Send me a message', openEmail);
 
-  /* --- career door: straight to LinkedIn --- */
-  const cd = group(44.6, 0, 5.94);
-  box(cd, 1.0, 2.1, 0.08, 0x1f4e5f, 0, 1.05, 0);
-  box(cd, 0.66, 0.7, 0.03, 0x2b6477, 0, 1.5, -0.045); box(cd, 0.66, 0.7, 0.03, 0x2b6477, 0, 0.6, -0.045);
-  sph(cd, 0.05, 0xd9b34a, -0.38, 1.02, -0.08);
-  box(cd, 0.08, 2.2, 0.1, 0xf5f1e8, -0.54, 1.1, 0); box(cd, 0.08, 2.2, 0.1, 0xf5f1e8, 0.54, 1.1, 0); box(cd, 1.16, 0.08, 0.1, 0xf5f1e8, 0, 2.18, 0);
-  plane(cd, 1.0, 0.3, sign('CAREER', 1.0, 0.3, '#f2b441', '#1a1303'), 0, 2.48, -0.06, Math.PI);
-  interact(cd, 'Career: open my LinkedIn', openLinkedIn);
+  /* --- front door to outside: locked until the key is found (the key comes later) --- */
+  const fd = group(44.6, 0, 5.94);
+  box(fd, 1.0, 2.1, 0.08, 0x7a2e2a, 0, 1.05, 0);
+  for (const [px, py] of [[-0.22, 1.55], [0.22, 1.55], [-0.22, 0.95], [0.22, 0.95], [-0.22, 0.38], [0.22, 0.38]]) box(fd, 0.34, py > 0.5 ? 0.46 : 0.5, 0.03, 0x8c3a35, px, py, -0.045);
+  sph(fd, 0.05, 0xd9b34a, -0.38, 1.02, -0.08); cyl(fd, 0.04, 0.04, 0.03, 0xd9b34a, -0.38, 1.2, -0.055, 14).rotation.x = Math.PI / 2;   // knob + deadbolt
+  box(fd, 0.012, 0.035, 0.01, 0x222222, -0.38, 1.2, -0.073);                                                                    // keyhole
+  box(fd, 0.08, 2.2, 0.1, 0xf5f1e8, -0.54, 1.1, 0); box(fd, 0.08, 2.2, 0.1, 0xf5f1e8, 0.54, 1.1, 0); box(fd, 1.16, 0.08, 0.1, 0xf5f1e8, 0, 2.18, 0);
+  box(fd, 0.9, 0.02, 0.5, 0x4a5a3a, 0, 0.011, -0.33);                                                                           // doormat
+  plane(fd, 0.62, 0.2, sign('OUTSIDE', 0.62, 0.2, '#f5f1e8', '#3a3024', 'Georgia, serif', false), 0, 2.36, -0.06, Math.PI);
+  interact(fd, 'Front door', tryFrontDoor);
+
+  /* --- career: a suit on a hanger; takes you straight to LinkedIn --- */
+  const suit = group(43.0, 0, 5.9);
+  const navy = 0x1e2a44, navy2 = 0x263556;
+  box(suit, 0.1, 0.04, 0.1, 0xd9b34a, 0, 2.0, -0.05); cyl(suit, 0.008, 0.008, 0.14, 0xb9bcc4, 0, 1.93, -0.09, 8);              // wall hook + hanger neck
+  for (const sx of [-1, 1]) { const arm = box(suit, 0.3, 0.025, 0.03, 0x8a6a4a, sx * 0.14, 1.83, -0.09); arm.rotation.z = -sx * 0.22; }
+  box(suit, 0.56, 0.1, 0.16, navy, 0, 1.76, -0.09);                                                                             // shoulders
+  box(suit, 0.5, 0.62, 0.14, navy, 0, 1.42, -0.09);                                                                             // jacket body
+  for (const sx of [-1, 1]) { const sl = box(suit, 0.12, 0.62, 0.12, navy2, sx * 0.315, 1.44, -0.09); sl.rotation.z = sx * 0.07; }
+  box(suit, 0.13, 0.34, 0.02, 0xf4f1ea, 0, 1.6, -0.165);                                                                        // shirt
+  box(suit, 0.045, 0.3, 0.02, 0x9b1c2c, 0, 1.58, -0.172); box(suit, 0.06, 0.05, 0.022, 0x9b1c2c, 0, 1.745, -0.172);            // tie
+  for (const sx of [-1, 1]) { const lp = box(suit, 0.1, 0.38, 0.02, navy2, sx * 0.1, 1.6, -0.168); lp.rotation.z = sx * 0.2; }  // lapels
+  for (const y of [1.3, 1.2]) cyl(suit, 0.014, 0.014, 0.01, 0x111111, 0.03, y, -0.165, 10).rotation.x = Math.PI / 2;           // buttons
+  box(suit, 0.1, 0.02, 0.02, 0xf4f1ea, 0.15, 1.56, -0.166);                                                                     // pocket square
+  for (const sx of [-1, 1]) box(suit, 0.2, 0.72, 0.1, navy, sx * 0.11, 0.76, -0.08);                                            // trousers
+  plane(suit, 0.56, 0.17, sign('CAREER', 0.56, 0.17, '#f2b441', '#1a1303'), 0, 2.22, -0.02, Math.PI);
+  interact(suit, 'Career: open my LinkedIn', openLinkedIn);
 
   /* --- big camera on a tripod; its rear screen shows the Instagram profile it is "shooting" --- */
   const cam = group(34.5, 0, -4.5); cam.rotation.y = Math.PI * 0.27;                    // back of the camera faces the room
@@ -397,7 +416,7 @@ function tombstone(parent, name, x, y, z, s) {
 const S = {
   mode: 'waking',           // waking | world | panel | game | blackout
   pos: new THREE.Vector3().copy(BED.lie), yaw: 0, pitch: 0, roll: 0,
-  drinks: 0, limit: 10, t: 0, wakeT: 0, paused: false, target: null, bob: 0, seenLiving: false,
+  drinks: 0, limit: 10, hasKey: false, t: 0, wakeT: 0, paused: false, target: null, bob: 0, seenLiving: false,
 };
 const keys = {};
 const stick = { f: 0, s: 0 };       // touch joystick
@@ -433,7 +452,8 @@ function toast(msg, ms = 1800) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
-function wobbleFilter() { canvas.style.filter = S.drinks > 2 && S.mode !== 'game' ? `blur(${((S.drinks - 2) * 0.3).toFixed(2)}px)` : ''; }
+// the more you drank, the blurrier everything gets (games included)
+function wobbleFilter() { canvas.style.filter = S.drinks > 0 ? `blur(${(S.drinks * (S.mode === 'game' ? 0.34 : 0.26)).toFixed(2)}px)` : ''; }
 function showWorldHud(v) {
   $('hud').classList.remove('hidden');
   $('cross').classList.toggle('hidden', !v);
@@ -446,7 +466,7 @@ function showControls() {
   const c = $('controls');
   c.innerHTML = TOUCH
     ? '<b>Good morning</b>Left stick to move · drag to look<br>Tap things, or press USE'
-    : '<b>Good morning</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · mouse to look<br><kbd>E</kbd> or click to use · <kbd>E</kbd> / <kbd>Esc</kbd> to close<br>Click once to look around';
+    : '<b>Good morning</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to move · mouse to look<br><kbd>E</kbd> or click to use · <kbd>E</kbd> / <kbd>Esc</kbd> to close<br>Click once to look around';
   c.classList.add('show'); clearTimeout(controlsTimer); controlsTimer = setTimeout(() => c.classList.remove('show'), 3000);
 }
 
@@ -531,6 +551,10 @@ function openLink(url) {
   else unlock();
 }
 function openLinkedIn() { openLink(LINKS.linkedin); }
+function tryFrontDoor() {
+  if (!S.hasKey) { toast('🔒 Locked. There must be a key around here somewhere.', 2600); return; }
+  toast('The key fits. (Outside is coming soon.)', 2600);
+}
 function openInstagram() {
   const b = $('black'); b.style.transition = 'none'; b.style.background = '#fff'; b.style.opacity = 0.9;       // camera flash
   setTimeout(() => { b.style.transition = 'opacity .5s ease'; b.style.opacity = 0; setTimeout(() => (b.style.background = '#000'), 520); }, 60);
@@ -541,7 +565,7 @@ function openInstagram() {
 const MAKERS = { lacrosse: createLacrosse, rocket: createRocket, parkour: createParkour };
 const BLURB = {
   lacrosse: TOUCH ? 'Drag to aim. Hold SHOOT and release at full power. 30 seconds.' : 'Aim with the mouse. Hold click and release at full power. 30 seconds.',
-  rocket: 'Launch, drop stage 2 at the right moment, then land the booster on what fuel is left.',
+  rocket: 'Launch, drop stage 2 at the right moment, then land the booster on what fuel is left. Watch the wind.',
   parkour: TOUCH ? 'Run three live charts. Dodge crashes, spikes and bears.' : 'Run three live charts. Space to jump. Dodge crashes, spikes and bears.',
 };
 async function fillBoard(game, el, n = 5) {
@@ -586,7 +610,7 @@ function startGame(name, opt = {}) {
   activeName = name; activeOpt = opt; lastHud = ''; $('ghud').innerHTML = '';
   active = MAKERS[name](THREE, ctx, opt);
   active.camera.aspect = innerWidth / innerHeight; active.camera.updateProjectionMatrix();
-  S.mode = 'game'; canvas.style.filter = ''; setPaused(false); showWorldHud(false); $('controls').classList.remove('show');
+  S.mode = 'game'; wobbleFilter(); setPaused(false); showWorldHud(false); $('controls').classList.remove('show');
   lock();
 }
 function exitGame(toMenu) {
@@ -682,7 +706,7 @@ if (TOUCH) {
     #tAct:active{filter:brightness(1.15)}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
-    #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
+    .g-wind{top:60px;left:12px;font-size:12px} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
     .g-top{top:12px;max-width:96vw;flex-wrap:wrap;justify-content:center} .pill{font-size:12.5px;padding:6px 10px} .g-bar{bottom:150px;width:200px} .g-msg{font-size:22px;white-space:normal;width:86vw}
     .g-band{width:220px} #controls{white-space:normal;width:80vw}`;
   document.head.appendChild(css);
