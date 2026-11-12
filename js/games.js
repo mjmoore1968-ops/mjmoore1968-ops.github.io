@@ -137,7 +137,7 @@ export function createLacrosse(THREE, ctx) {
       let tx = st.shadow + Math.sin(st.t * 1.7) * 0.06, ty = 1.15;
       const lead = st.balls.find(b => b.live && b.v.z < 0 && st.t - b.born > 0.11);
       if (lead) { const p = lead.m.position, k = -p.z / lead.v.z; tx = clamp(p.x + lead.v.x * k, -HW + 0.25, HW - 0.25); ty = clamp(p.y + lead.v.y * k - 4.9 * k * k, 0.35, 1.7); }
-      const gs = (1.045 + st.goals * 0.066) * dt;
+      const gs = (0.888 + st.goals * 0.056) * dt;
       st.gx += clamp(tx - st.gx, -gs, gs); st.gy += clamp(ty - st.gy, -2.4 * dt, 2.4 * dt);
       if (lead) st.side = tx > st.gx ? 1 : -1;
       goalie.position.x = st.gx; goalie.rotation.y = st.th * 0.6;
@@ -154,8 +154,8 @@ export function createLacrosse(THREE, ctx) {
           const inside = Math.abs(x) < HW - 0.05 && y < G - 0.05 && y > 0;
           const onPipe = (Math.abs(Math.abs(x) - HW) < 0.11 && y < G + 0.1) || (Math.abs(y - G) < 0.11 && Math.abs(x) < HW + 0.1);
           if (inside) {
-            const gwx = st.gx + hx + st.side * 0.07, body = Math.abs(x - st.gx) < 0.2565 && y < 1.78;
-            const stickSave = Math.hypot(x - gwx, y - hy) < 0.2185;
+            const gwx = st.gx + hx + st.side * 0.07, body = Math.abs(x - st.gx) < 0.218 && y < 1.78;
+            const stickSave = Math.hypot(x - gwx, y - hy) < 0.186;
             if (body || stickSave) { say(stickSave ? 'Stick save!' : 'Saved!', st.streak > 1 ? 'Streak over' : ''); st.streak = 0; b.v.set((x - st.gx) * 5 + rand(-1, 1), 2.5, 5); p.z = 0.08; }
             else {
               const corner = Math.abs(x) > HW - 0.5 && (y > G - 0.5 || y < 0.5);
@@ -205,7 +205,9 @@ function energyAfter(V, t) {
   return h + v * v / (2 * G0);
 }
 export function createRocket(THREE, ctx, opt = {}) {
-  const key = VEHICLES[opt.vehicle] ? opt.vehicle : 'f9', V = VEHICLES[key];
+  const key = VEHICLES[opt.vehicle] ? opt.vehicle : 'f9', EASE = 1.15, r1 = v => Math.round(v * 10) / 10;
+  const V = { ...VEHICLES[key] }; V.vyMax = r1(V.vyMax * EASE); V.tiltMax = r1(V.tiltMax * EASE); V.padW = r1(V.padW * EASE);
+  const VX_MAX = r1(3.5 * EASE);
   const E_MIN = energyAfter(V, V.burnT * 0.5), E_MAX = energyAfter(V, V.burnT * 0.6);
   const km = e => Math.round(60 + e * 0.38);
   const scene = new THREE.Scene(); const bgLow = new THREE.Color(0x27466b), bgHigh = new THREE.Color(0x04060c); scene.background = bgLow.clone();
@@ -286,7 +288,7 @@ export function createRocket(THREE, ctx, opt = {}) {
   const boom = add(new THREE.SphereGeometry(1, 18, 14), new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true }), 0, 0, 0); boom.visible = false;
 
   const BURN = 100 / V.burnT;
-  const WIND0 = (Math.random() < 0.5 ? -1 : 1) * rand(3, 9) * (V.tower ? 0.6 : 1), GUST = rand(1, 3) * (V.tower ? 0.6 : 1), WPH = rand(0, 6.28);
+  const WIND0 = (Math.random() < 0.5 ? -1 : 1) * rand(4, 11.5) * (V.tower ? 0.6 : 1), GUST = rand(1.3, 3.8) * (V.tower ? 0.6 : 1), WPH = rand(0, 6.28);
   const st = { wind: WIND0, x: V.launchX, y: DECK + 0.3, vx: 0, vy: 0, th: 0, om: 0, fuel: 100, hold: false, phase: 'pad', endT: 0, result: null, t: 0, sepE: 0, sepT: 0, s2: null, msg: '', msgT: 0, maxAlt: 0 };
   const GROUND = DECK + 0.3;
   function end(ok, text, score) {
@@ -336,7 +338,7 @@ export function createRocket(THREE, ctx, opt = {}) {
           st.y = floor; const dx = Math.abs(st.x - V.padX), tilt = Math.abs(st.th) * 57.3, where = V.tower ? 'the tower' : 'the drone ship';
           if (!onPad || dx > V.padW) end(false, isLand(st.x) ? `Came down on land, ${dx.toFixed(0)} m from ${where}.` : `Missed ${where}. Splashdown.`, 0);
           else if (st.vy < -V.vyMax) end(false, `Too fast: ${(-st.vy).toFixed(1)} m/s at touchdown. Keep it under ${V.vyMax}.`, 0);
-          else if (Math.abs(st.vx) > 3.5) end(false, `Sliding sideways at ${Math.abs(st.vx).toFixed(1)} m/s. Kill the drift first.`, 0);
+          else if (Math.abs(st.vx) > VX_MAX) end(false, `Sliding sideways at ${Math.abs(st.vx).toFixed(1)} m/s. Kill the drift first.`, 0);
           else if (tilt > V.tiltMax) end(false, `Tipped over: ${tilt.toFixed(0)}° of tilt. Land upright.`, 0);
           else {
             const orbit = st.sepE >= E_MIN, payload = orbit ? 300 + 300 * clamp((st.sepE - E_MIN) / (E_MAX - E_MIN), 0, 1) : 0;
@@ -391,7 +393,7 @@ export function createRocket(THREE, ctx, opt = {}) {
           a = (T/m)·n̂ − g·ŷ − k·|v−w|·(v−w) &nbsp; T/m = ${V.AT}, k = ${V.k}, w = wind<br>
           terminal velocity v<sub>t</sub> = √(g/k) ≈ ${Math.sqrt(G0 / V.k).toFixed(0)} m/s<br>
           stop height h = v² / (2·(T/m − g)): burn when ALT ≈ BURN@<br>
-          land: |v<sub>y</sub>| &lt; ${V.vyMax}, |v<sub>x</sub>| &lt; 3.5, tilt &lt; ${V.tiltMax}°, within ${V.padW} m</div>
+          land: |v<sub>y</sub>| &lt; ${V.vyMax}, |v<sub>x</sub>| &lt; ${VX_MAX}, tilt &lt; ${V.tiltMax}°, within ${V.padW} m</div>
         ${st.phase === 'landed' ? `<div class="g-msg">${V.tower ? 'Caught by the tower.' : 'The booster has landed.'}</div>` : st.phase === 'crashed' ? '<div class="g-msg">Rapid unscheduled disassembly</div>'
           : st.msgT > 0 ? `<div class="g-msg" style="font-size:22px">${st.msg}</div>`
           : st.phase === 'ascent' && st.t < 6 ? `<div class="g-msg" style="font-size:20px">${ctx.touch ? 'Stick up to burn · left/right to tilt · SEPARATE in the window' : 'W/↑ burn · A/D or ←/→ tilt · Space or click to separate'}<small>Every second you burn going up is fuel you will not have coming down.</small></div>` : ''}
