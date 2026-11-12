@@ -39,8 +39,8 @@ scene.add(new THREE.HemisphereLight(0xfff3df, 0x4a4038, 1.5));
 scene.add(new THREE.AmbientLight(0xffffff, 0.45));
 
 /* ------------------------------------------------------------------ builders */
-let OX = 0;                                   // x offset applied to anything added straight to the scene
-const ox = p => (p === scene ? OX : 0);
+let MX = x => x, MZ = z => z;                 // position mapping for anything added straight to the scene
+const mx = (p, x) => (p === scene ? MX(x) : x), mz = (p, z) => (p === scene ? MZ(z) : z);
 const mats = new Map();
 const mat = (color, o = {}) => {
   const k = color + JSON.stringify(o);
@@ -48,19 +48,19 @@ const mat = (color, o = {}) => {
   return mats.get(k);
 };
 const colliders = [];
-const col = (cx, cz, w, d) => { const c = { x0: cx + OX - w / 2, x1: cx + OX + w / 2, z0: cz - d / 2, z1: cz + d / 2 }; colliders.push(c); return c; };
+const col = (cx, cz, w, d) => { cx = MX(cx); cz = MZ(cz); const c = { x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 }; colliders.push(c); return c; };
 
 function box(parent, w, h, d, color, x, y, z, o) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'object' ? color : mat(color, o));
-  m.position.set(x + ox(parent), y, z); parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); parent.add(m); return m;
 }
 function cyl(parent, rt, rb, h, color, x, y, z, seg = 16, o) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), typeof color === 'object' ? color : mat(color, o));
-  m.position.set(x + ox(parent), y, z); parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); parent.add(m); return m;
 }
 function sph(parent, r, color, x, y, z, o) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat(color, o));
-  m.position.set(x + ox(parent), y, z); parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); parent.add(m); return m;
 }
 function tex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -70,9 +70,9 @@ function tex(w, h, draw) {
 function plane(parent, w, h, texture, x, y, z, ry = 0, basic = true) {
   const M = basic ? THREE.MeshBasicMaterial : THREE.MeshLambertMaterial;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new M({ map: texture, transparent: true }));
-  m.position.set(x + ox(parent), y, z); m.rotation.y = ry; parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); m.rotation.y = ry; parent.add(m); return m;
 }
-function group(x, y, z, parent = scene) { const g = new THREE.Group(); g.position.set(x + ox(parent), y, z); parent.add(g); return g; }
+function group(x, y, z, parent = scene) { const g = new THREE.Group(); g.position.set(mx(parent, x), y, mz(parent, z)); parent.add(g); return g; }
 
 const interactables = [];
 function interact(g, label, fn) { g.userData.interact = { label, fn }; interactables.push(g); }
@@ -91,13 +91,13 @@ function room(cx, cz, w, d, h, floorC, wallC, ceilC, skip) {
   for (const s of [-1, 1]) box(scene, w, 0.1, 0.03, 0xf5f1e8, cx, 0.05, cz + s * (d / 2 - 0.015));
 }
 function lamp(x, y, z, intensity = 14, color = 0xffd9a0) {
-  const l = new THREE.PointLight(color, intensity, 16, 1.6); l.position.set(x + OX, y, z); scene.add(l); return l;
+  const l = new THREE.PointLight(color, intensity, 16, 1.6); l.position.set(MX(x), y, MZ(z)); scene.add(l); return l;
 }
 function plant(x, z) {
   cyl(scene, 0.2, 0.15, 0.36, 0xb5653a, x, 0.18, z);
   for (let i = 0; i < 6; i++) {
     const a = i * 1.05, m = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.85, 6), mat(i % 2 ? 0x2f7d4f : 0x3c9460));
-    m.position.set(x + OX + Math.cos(a) * 0.12, 0.75, z + Math.sin(a) * 0.12);
+    m.position.set(MX(x) + Math.cos(a) * 0.12, 0.75, MZ(z) + Math.sin(a) * 0.12);
     m.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35); scene.add(m);
   }
   col(x, z, 0.45, 0.45);
@@ -201,7 +201,7 @@ const DOOR = { z0: 0.75, z1: 1.85, x: 3.6, open: false, t: 0, group: null, col: 
   // bedroom face
   seg(x - 0.05, -3, z0, 0, 2.8, 0xcbd3cf); seg(x - 0.05, z1, 3, 0, 2.8, 0xcbd3cf); seg(x - 0.05, z0, z1, DH, 2.8, 0xcbd3cf);
   // living-room face
-  seg(x + 0.05, -6, z0, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z1, 6, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z0, z1, DH, 3.2, 0xe7e0d3);
+  seg(x + 0.05, -5, z0, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z1, 5, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z0, z1, DH, 3.2, 0xe7e0d3);
   col(x, (-6.5 + z0) / 2, 0.2, z0 + 6.5); col(x, (z1 + 6.5) / 2, 0.2, 6.5 - z1);
   box(scene, 0.22, 0.02, z1 - z0, 0x5d4632, x, 0.005, (z0 + z1) / 2);                       // threshold
   // trim on both faces
@@ -243,11 +243,12 @@ function tombstone(parent, name, x, y, z, s) {
   plane(g, 0.68, 0.85, t, 0, 0.66, -0.092, Math.PI, false);
 }
 (function living() {
-  OX = LIV;
-  room(40, 0, 16, 12, 3.2, 0x9b7b58, 0xe7e0d3, 0xf5f2ec, 'nx');
-  box(scene, 0.03, 0.1, 5.25, 0xf5f1e8, 32.015, 0.05, (-6 + DOOR.z0) / 2 - 0.02).scale.z = (DOOR.z0 + 6) / 5.25;
-  box(scene, 0.03, 0.1, 4.15, 0xf5f1e8, 32.015, 0.05, (DOOR.z1 + 6) / 2);
-  box(scene, 0.02, 3.2, 12, 0x24344d, 47.98, 1.6, 0);            // accent wall behind the TV
+  // shell first (13 x 10), then furniture positions are squeezed from the original 16 x 12 layout
+  MX = x => x + LIV; MZ = z => z;
+  room(38.5, 0, 13, 10, 3.2, 0x9b7b58, 0xe7e0d3, 0xf5f2ec, 'nx');
+  box(scene, 0.03, 0.1, 5.75, 0xf5f1e8, 32.015, 0.05, -2.125); box(scene, 0.03, 0.1, 3.15, 0xf5f1e8, 32.015, 0.05, 3.425);
+  box(scene, 0.02, 3.2, 10, 0x24344d, 44.98, 1.6, 0);            // accent wall behind the TV
+  MX = x => (x >= 44 ? x - 3 : 32 + (x - 32) * 0.75) + LIV; MZ = z => (Math.abs(z) > 4 ? z - Math.sign(z) : z * 0.75);
   for (const [x, z] of [[36, -2.5], [36, 2.5], [44, -2.5], [44, 2.5]]) {
     lamp(x, 2.1, z, 9);
     cyl(scene, 0.2, 0.28, 0.1, 0xf5f1e8, x, 3.14, z, 16, { emissive: 0xffe6b0, emissiveIntensity: 0.9 });
@@ -331,36 +332,31 @@ function tombstone(parent, name, x, y, z, s) {
   plane(cd, 1.0, 0.3, sign('CAREER', 1.0, 0.3, '#f2b441', '#1a1303'), 0, 2.48, -0.06, Math.PI);
   interact(cd, 'Career: open my LinkedIn', openLinkedIn);
 
-  /* --- big camera on a tripod, with a lit screen showing Instagram --- */
-  const cam = group(34.5, 0, -4.5); cam.rotation.y = Math.PI * 0.27;                    // faces into the room
+  /* --- big camera on a tripod; its rear screen shows the Instagram profile it is "shooting" --- */
+  const cam = group(34.5, 0, -4.5); cam.rotation.y = Math.PI * 0.27;                    // back of the camera faces the room
   for (let i = 0; i < 3; i++) {
-    const a = i * 2.094 + 0.5, leg = cyl(cam, 0.022, 0.022, 1.35, 0x222222, Math.cos(a) * 0.24, 0.64, Math.sin(a) * 0.24, 8);
-    leg.rotation.z = Math.cos(a) * 0.36; leg.rotation.x = -Math.sin(a) * 0.36;
+    const a = i * 2.094 + 0.5, leg = cyl(cam, 0.024, 0.024, 1.3, 0x222222, Math.cos(a) * 0.25, 0.61, Math.sin(a) * 0.25, 8);
+    leg.rotation.z = Math.cos(a) * 0.38; leg.rotation.x = -Math.sin(a) * 0.38;
   }
-  cyl(cam, 0.05, 0.05, 0.12, 0x222222, 0, 1.32, 0);
-  box(cam, 0.62, 0.42, 0.3, 0x1b1d22, 0, 1.6, 0); box(cam, 0.22, 0.1, 0.22, 0x1b1d22, -0.12, 1.86, 0); box(cam, 0.14, 0.44, 0.34, 0x26292f, 0.25, 1.6, 0);
-  cyl(cam, 0.15, 0.17, 0.26, 0x2c2f36, -0.08, 1.6, 0.27, 24).rotation.x = Math.PI / 2;
-  cyl(cam, 0.115, 0.115, 0.01, 0x5d7fa8, -0.08, 1.6, 0.402, 24, { emissive: 0x223a5e }).rotation.x = Math.PI / 2;
-  cyl(cam, 0.04, 0.04, 0.03, 0xd9d9de, 0.2, 1.83, 0.05, 12); sph(cam, 0.02, 0xd64545, 0.27, 1.75, 0.16, { emissive: 0xd64545 });
-  // flip-out screen facing the room
-  box(cam, 0.05, 0.05, 0.05, 0x1b1d22, 0.34, 1.6, 0.1);
-  box(cam, 0.78, 0.98, 0.04, 0x0b0b0e, 0.76, 1.62, 0.14);
-  const igTex = tex(480, 640, (c, W, H) => {
-    c.fillStyle = '#fafafa'; c.fillRect(0, 0, W, H);
-    c.fillStyle = '#111'; c.font = 'bold 30px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText('matthew.moore04', W / 2, 46);
-    const gr = c.createLinearGradient(40, 80, 150, 190); gr.addColorStop(0, '#f9ce34'); gr.addColorStop(0.5, '#ee2a7b'); gr.addColorStop(1, '#6228d7');
-    c.fillStyle = gr; c.beginPath(); c.arc(100, 140, 56, 0, 7); c.fill(); c.fillStyle = '#fafafa'; c.beginPath(); c.arc(100, 140, 49, 0, 7); c.fill();
-    c.fillStyle = '#24344d'; c.beginPath(); c.arc(100, 140, 44, 0, 7); c.fill(); c.fillStyle = '#f2b441'; c.font = 'bold 38px Georgia, serif'; c.fillText('MM', 100, 153);
-    c.fillStyle = '#111'; c.font = 'bold 24px system-ui, sans-serif'; c.textAlign = 'left'; c.fillText('Matthew Moore', 190, 128);
-    c.fillStyle = '#555'; c.font = '20px system-ui, sans-serif'; c.fillText('@matthew.moore04', 190, 160);
-    c.fillStyle = '#0095f6'; c.fillRect(40, 220, W - 80, 48); c.fillStyle = '#fff'; c.font = 'bold 24px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText('Follow', W / 2, 253);
-    const tiles = ['#3d5a80', '#e76f51', '#2a9d8f', '#e9c46a', '#264653', '#9b1c2c'];
-    for (let i = 0; i < 6; i++) { c.fillStyle = tiles[i]; c.fillRect(40 + (i % 3) * 136, 300 + Math.floor(i / 3) * 136, 128, 128); }
-    c.fillStyle = '#555'; c.font = '20px system-ui, sans-serif'; c.fillText(TOUCH ? 'Tap to open Instagram' : 'Press E to open Instagram', W / 2, 606);
+  cyl(cam, 0.06, 0.06, 0.1, 0x222222, 0, 1.24, 0);
+  box(cam, 1.04, 0.68, 0.36, 0x1b1d22, 0, 1.63, 0);                                     // body
+  box(cam, 0.2, 0.7, 0.4, 0x26292f, -0.46, 1.63, -0.02);                                // grip (photographer's right hand)
+  box(cam, 0.3, 0.14, 0.26, 0x1b1d22, 0.1, 2.03, 0); box(cam, 0.14, 0.09, 0.06, 0x0b0b0e, 0.1, 2.03, 0.14);   // viewfinder hump + eyepiece
+  cyl(cam, 0.05, 0.05, 0.04, 0xd9d9de, -0.4, 2.0, -0.02, 14); cyl(cam, 0.07, 0.07, 0.05, 0x33363d, 0.38, 2.0, 0, 16);
+  cyl(cam, 0.24, 0.27, 0.34, 0x2c2f36, 0.06, 1.63, -0.34, 28).rotation.x = Math.PI / 2;  // lens points away, into the corner
+  cyl(cam, 0.2, 0.2, 0.012, 0x5d7fa8, 0.06, 1.63, -0.515, 28, { emissive: 0x223a5e }).rotation.x = Math.PI / 2;
+  box(cam, 0.84, 0.6, 0.02, 0x0b0b0e, 0.06, 1.63, 0.182);                               // screen bezel
+  for (let i = 0; i < 3; i++) cyl(cam, 0.022, 0.022, 0.015, 0x3a3e46, -0.44, 1.78 - i * 0.12, 0.185, 12).rotation.x = Math.PI / 2;
+  sph(cam, 0.016, 0xd64545, -0.44, 1.4, 0.185, { emissive: 0xd64545 });
+  const igTex = tex(600, 406, (c, W, H) => {                                             // shown until img/instagram.jpg loads
+    c.fillStyle = '#0d1014'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#fff'; c.font = 'bold 30px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText('matthew.moore04', W / 2, 190);
+    c.fillStyle = '#0095f6'; c.fillRect(W / 2 - 110, 220, 220, 44); c.fillStyle = '#fff'; c.font = 'bold 22px system-ui, sans-serif'; c.fillText('Follow', W / 2, 250);
   });
-  igScreen = plane(cam, 0.72, 0.92, igTex, 0.76, 1.62, 0.162, 0);
-  const g2 = new THREE.PointLight(0xdfe8ff, 2.2, 4, 1.8); g2.position.set(0.76, 1.62, 0.6); cam.add(g2);
-  col(34.5, -4.5, 0.9, 0.9);
+  igScreen = plane(cam, 0.78, 0.528, igTex, 0.06, 1.63, 0.194, 0);
+  new THREE.TextureLoader().load('img/instagram.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; igScreen.material.map = t; igScreen.material.needsUpdate = true; });
+  const g2 = new THREE.PointLight(0xdfe8ff, 2.4, 4, 1.8); g2.position.set(0.06, 1.63, 0.7); cam.add(g2);
+  col(34.5, -4.5, 0.95, 0.95);
   interact(cam, 'Open my Instagram', openInstagram);
 
   /* --- bookshelf, with three tiny headstone ornaments on the middle shelf --- */
@@ -369,15 +365,16 @@ function tombstone(parent, name, x, y, z, s) {
   const bk = [0xd64545, 0xe9c46a, 0x2a9d8f, 0x264653, 0xf4a261, 0x8ecae6, 0x6d597a];
   for (let r = 0; r < 4; r++) {
     box(scene, 1.4, 0.03, 0.3, 0x7d5a3c, 45.2, 0.25 + r * 0.48, -5.76);
-    if (r === 2) continue;
-    for (let i = 0; i < 9; i++) box(scene, 0.09, 0.26 + ((i * 7 + r * 3) % 5) * 0.025, 0.2, bk[(i + r * 2) % bk.length], 44.62 + i * 0.135, 0.41 + r * 0.48, -5.72);
+    for (let i = 0; i < 9; i++) {
+      if (r === 2 && i > 1 && i < 7) continue;                                          // the gap the headstones sit in
+      box(scene, 0.09, 0.26 + ((i * 7 + r * 3) % 5) * 0.025, 0.2, bk[(i + r * 2) % bk.length], 44.62 + i * 0.135, 0.41 + r * 0.48, -5.72);
+    }
   }
-  box(scene, 1.4, 0.03, 0.46, 0x7d5a3c, 45.2, 1.21, -5.7);                              // display ledge
-  ['Jake', 'Leo', 'Nathaniel'].forEach((name, i) => tombstone(scene, name, 44.78 + i * 0.42, 1.225, -5.56, 0.32));
+  ['Jake', 'Leo', 'Nathaniel'].forEach((name, i) => tombstone(scene, name, 44.96 + i * 0.2, 1.225, -5.612, 0.12));
 
   /* --- lacrosse stick leaning in the corner --- */
   const lx = makeLacrosseStick(THREE, { head: 1.15, shaft: 1.0, headColor: 0xffffff, shaftColor: 0x9b1c2c });
-  lx.position.set(47.55 + OX, 1.0, 5.55); lx.rotation.set(-0.22, 0.6, -0.2); scene.add(lx);
+  lx.position.set(MX(47.55), 1.0, MZ(5.55)); lx.rotation.set(-0.22, 0.6, -0.2); scene.add(lx);
   sph(scene, 0.032, 0xfffb8a, 47.2, 0.032, 5.35);
 
   /* --- decor --- */
@@ -386,14 +383,14 @@ function tombstone(parent, name, x, y, z, s) {
     c.fillStyle = '#f5efe2'; c.fillRect(0, 0, W, H); c.fillStyle = '#e76f51'; c.beginPath(); c.arc(90, 80, 46, 0, 7); c.fill();
     c.fillStyle = '#264653'; c.fillRect(130, 40, 86, 96); c.fillStyle = '#e9c46a'; c.fillRect(40, 118, 150, 16);
   }), 41.2, 1.9, 5.96, Math.PI, false);
-  cyl(scene, 0.16, 0.18, 0.03, 0x222222, 42.9, 0.015, 1.9); cyl(scene, 0.015, 0.015, 1.6, 0x222222, 42.9, 0.8, 1.9, 8);
-  cyl(scene, 0.13, 0.2, 0.26, 0xfff0cc, 42.9, 1.68, 1.9, 16, { emissive: 0xffd68a, emissiveIntensity: 0.8 });
-  col(42.9, 1.9, 0.3, 0.3);
+  cyl(scene, 0.16, 0.18, 0.03, 0x222222, 42.9, 0.015, 3.5); cyl(scene, 0.015, 0.015, 1.6, 0x222222, 42.9, 0.8, 3.5, 8);
+  cyl(scene, 0.13, 0.2, 0.26, 0xfff0cc, 42.9, 1.68, 3.5, 16, { emissive: 0xffd68a, emissiveIntensity: 0.8 });
+  col(42.9, 3.5, 0.3, 0.3);
   // a side table and armchair so the middle of the room is not empty
   box(scene, 0.9, 0.4, 0.9, 0xa35d4a, 37.2, 0.2, 3.9); box(scene, 0.9, 0.55, 0.22, 0xa35d4a, 37.2, 0.68, 4.3);
   box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 36.78, 0.55, 3.9); box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 37.62, 0.55, 3.9); col(37.2, 3.95, 0.95, 1.0);
   cyl(scene, 0.3, 0.3, 0.04, 0x6b4a2f, 38.3, 0.5, 4.2, 20); cyl(scene, 0.03, 0.03, 0.5, 0x333333, 38.3, 0.25, 4.2, 8); col(38.3, 4.2, 0.5, 0.5);
-  OX = 0;
+  MX = x => x; MZ = z => z;
 })();
 
 /* ------------------------------------------------------------------ state */
