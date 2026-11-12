@@ -229,6 +229,7 @@ function openDoor() {
 /* ------------------------------------------------------------------ living room (built at x 32..48, shifted next to the bedroom) */
 const LIV = 3.7 - 32;                         // living-room x offset: its west wall sits on the shared wall
 let igScreen = null;
+const buddy = { head: null, root: null, yaw: 0 };
 function tombstone(parent, name, x, y, z, s) {
   const g = group(x, y, z, parent); g.scale.setScalar(s); g.rotation.y = Math.PI;       // faces +z
   box(g, 0.9, 0.12, 0.36, 0x777a80, 0, 0.06, 0);
@@ -409,6 +410,44 @@ function tombstone(parent, name, x, y, z, s) {
   box(scene, 0.9, 0.4, 0.9, 0xa35d4a, 37.2, 0.2, 3.9); box(scene, 0.9, 0.55, 0.22, 0xa35d4a, 37.2, 0.68, 4.3);
   box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 36.78, 0.55, 3.9); box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 37.62, 0.55, 3.9); col(37.2, 3.95, 0.95, 1.0);
   cyl(scene, 0.3, 0.3, 0.04, 0x6b4a2f, 38.3, 0.5, 4.2, 20); cyl(scene, 0.03, 0.03, 0.5, 0x333333, 38.3, 0.25, 4.2, 8); col(38.3, 4.2, 0.5, 0.5);
+
+  /* --- a friend sitting in the armchair: brown swept-up hair, navy suit and tie. Click to visit his site. --- */
+  const guy = group(37.2, 0, 3.9);
+  const skin = 0xf0c8a6, suitC = 0x1a2238, hairC = 0x5b3f2a, tieC = 0x27408f;
+  for (const sx of [-1, 1]) {
+    box(guy, 0.15, 0.14, 0.44, suitC, sx * 0.1, 0.48, -0.2);                             // thighs
+    box(guy, 0.13, 0.42, 0.13, suitC, sx * 0.1, 0.23, -0.42);                            // shins
+    box(guy, 0.13, 0.07, 0.25, 0x3a2416, sx * 0.1, 0.035, -0.47);                        // shoes
+    box(guy, 0.11, 0.3, 0.13, suitC, sx * 0.25, 0.93, 0.07).rotation.z = sx * 0.12;      // upper arms
+    box(guy, 0.1, 0.09, 0.3, suitC, sx * 0.3, 0.75, -0.08);                              // forearms on the armrests
+    box(guy, 0.105, 0.02, 0.03, 0xf4f1ea, sx * 0.3, 0.75, -0.235);                       // shirt cuffs
+    sph(guy, 0.05, skin, sx * 0.3, 0.75, -0.27);                                         // hands
+    box(guy, 0.1, 0.34, 0.02, 0x222c47, sx * 0.09, 0.93, -0.036).rotation.z = sx * 0.2;  // lapels
+  }
+  box(guy, 0.4, 0.52, 0.22, suitC, 0, 0.8, 0.08); box(guy, 0.46, 0.1, 0.24, suitC, 0, 1.06, 0.08);   // torso + shoulders
+  box(guy, 0.12, 0.34, 0.02, 0xf4f1ea, 0, 0.93, -0.034);                                 // shirt
+  box(guy, 0.05, 0.3, 0.02, tieC, 0, 0.9, -0.042); box(guy, 0.06, 0.05, 0.024, tieC, 0, 1.07, -0.042);
+  for (const sx of [-1, 1]) box(guy, 0.07, 0.05, 0.03, 0xf4f1ea, sx * 0.045, 1.1, -0.03).rotation.z = -sx * 0.5;   // collar points
+  cyl(guy, 0.055, 0.06, 0.1, skin, 0, 1.14, 0.06, 12);                                   // neck
+  const head = group(0, 1.19, 0.06, guy);
+  box(head, 0.2, 0.25, 0.21, skin, 0, 0.125, 0);                                         // face
+  box(head, 0.17, 0.05, 0.19, skin, 0, -0.005, 0);                                       // jaw
+  for (const sx of [-1, 1]) {
+    box(head, 0.03, 0.07, 0.04, skin, sx * 0.112, 0.13, 0.02);                           // ears
+    box(head, 0.035, 0.028, 0.012, 0xffffff, sx * 0.05, 0.155, -0.106);                  // eyes
+    box(head, 0.02, 0.024, 0.014, 0x2a1a10, sx * 0.05, 0.155, -0.108);
+    box(head, 0.062, 0.016, 0.014, 0x3a281b, sx * 0.05, 0.19, -0.108).rotation.z = -sx * 0.1;   // thick eyebrows
+    box(head, 0.03, 0.17, 0.2, hairC, sx * 0.104, 0.2, 0.012);                           // hair at the sides
+  }
+  box(head, 0.03, 0.05, 0.03, 0xe6b894, 0, 0.11, -0.115);                                // nose
+  box(head, 0.075, 0.012, 0.012, 0xb86f62, 0, 0.055, -0.107);                            // a small closed-mouth smile
+  box(head, 0.22, 0.07, 0.23, hairC, 0, 0.275, 0.005);                                   // hair on top
+  box(head, 0.2, 0.2, 0.04, hairC, 0, 0.19, 0.11);                                       // back of the head
+  const tuft = box(head, 0.2, 0.08, 0.1, hairC, 0.01, 0.305, -0.07); tuft.rotation.x = 0.45;       // front swept up
+  box(head, 0.14, 0.05, 0.12, 0x6a4a32, -0.02, 0.325, 0.0).rotation.z = 0.12;
+  buddy.head = head; buddy.root = guy;
+  interact(guy, 'Visit patricksliz.com', () => openLink('https://patricksliz.com/'));
+
   MX = x => x; MZ = z => z;
 })();
 
@@ -777,6 +816,12 @@ function updateWorld(dt) {
   S.t += dt;
   if (S.mode === 'waking') updateWake(dt);
   if (DOOR.open && DOOR.t < 1) { DOOR.t = Math.min(1, DOOR.t + dt / 0.7); DOOR.group.rotation.y = ease(DOOR.t) * 1.85; }
+  if (buddy.head) {                               // he watches you walk around, and breathes
+    const p = buddy.root.position, want = Math.atan2(-(S.pos.x - p.x), -(S.pos.z - p.z));
+    buddy.yaw += (clamp(want, -1.1, 1.1) - buddy.yaw) * Math.min(1, dt * 3);
+    buddy.head.rotation.y = buddy.yaw; buddy.head.rotation.x = Math.sin(S.t * 0.8) * 0.03;
+    buddy.head.position.y = 1.19 + Math.sin(S.t * 1.6) * 0.004;
+  }
   const moving = S.mode === 'world' && !S.paused;
   const d = S.drinks;
   if (moving) {
