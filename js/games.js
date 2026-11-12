@@ -159,7 +159,7 @@ export function createLacrosse(THREE, ctx) {
             if (body || stickSave) { say(stickSave ? 'Stick save!' : 'Saved!', st.streak > 1 ? 'Streak over' : ''); st.streak = 0; b.v.set((x - st.gx) * 5 + rand(-1, 1), 2.5, 5); p.z = 0.08; }
             else {
               const corner = Math.abs(x) > HW - 0.5 && (y > G - 0.5 || y < 0.5);
-              st.goals++; st.streak++;
+              st.goals++; st.streak++; ctx.onGoal?.();
               const bonus = []; let pts = 1;
               if (corner) { pts += 1; bonus.push('corner'); }
               if (b.bounced) { pts += 1; bonus.push('bounce shot'); }
@@ -206,8 +206,8 @@ function energyAfter(V, t) {
 }
 export function createRocket(THREE, ctx, opt = {}) {
   const key = VEHICLES[opt.vehicle] ? opt.vehicle : 'f9', EASE = 1.15, r1 = v => Math.round(v * 10) / 10;
-  const V = { ...VEHICLES[key] }; V.vyMax = r1(V.vyMax * EASE); V.tiltMax = r1(V.tiltMax * EASE); V.padW = r1(V.padW * EASE);
-  const VX_MAX = r1(3.5 * EASE);
+  const V = { ...VEHICLES[key] }; V.vyMax = r1(V.vyMax * EASE + 1); V.tiltMax = r1(V.tiltMax * EASE); V.padW = r1(V.padW * EASE);
+  const VX_MAX = r1(3.5 * EASE + 1);
   const E_MIN = energyAfter(V, V.burnT * 0.5), E_MAX = energyAfter(V, V.burnT * 0.6);
   const km = e => Math.round(60 + e * 0.38);
   const scene = new THREE.Scene(); const bgLow = new THREE.Color(0x27466b), bgHigh = new THREE.Color(0x04060c); scene.background = bgLow.clone();

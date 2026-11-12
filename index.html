@@ -107,6 +107,19 @@
     padding:10px 14px;font:13px/1.7 ui-monospace,Menlo,monospace;min-width:190px}
   .g-wind{position:absolute;left:16px;top:44px;background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:13px ui-monospace,Menlo,monospace}
   .g-wind b{color:var(--amber)}
+  .g-prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);padding:8px 14px;border-radius:999px;font-size:14px;white-space:nowrap}
+  .g-tip{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:rgba(255,255,255,.85);font-size:12.5px;text-shadow:0 1px 3px #000;white-space:nowrap}
+  .g-bar.golf{width:340px;height:16px;bottom:48px;overflow:visible} .g-bar.golf i{border-radius:8px}
+  .g-bar.golf u{position:absolute;top:-6px;bottom:-6px;width:4px;margin-left:-2px;background:#fff;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  #key{position:fixed;z-index:30;left:50%;top:44%;width:190px;transform:translate(-50%,-50%) scale(0);opacity:0;pointer-events:none;
+    transition:left .9s cubic-bezier(.5,0,.2,1),top .9s cubic-bezier(.5,0,.2,1),width .9s cubic-bezier(.5,0,.2,1),transform .5s ease,opacity .3s ease;filter:drop-shadow(0 6px 18px rgba(0,0,0,.6))}
+  #key.pop{opacity:1;transform:translate(-50%,-50%) scale(1)} #key.pop svg{animation:keyspin 1.5s ease-in-out}
+  #key.dock{opacity:1;left:16px;top:calc(100% - 52px);width:64px;transform:none}
+  @keyframes keyspin{0%{transform:rotateY(0) scale(.4)}60%{transform:rotateY(720deg) scale(1.15)}100%{transform:rotateY(720deg) scale(1)}}
+  table.card{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums;margin:8px 0 4px}
+  table.card td,table.card th{border:1px solid var(--line);padding:5px 4px;text-align:center;font-weight:500}
+  table.card th{color:var(--dim);font-weight:600;text-align:left;padding-left:8px}
+  .under{color:var(--green)} .over{color:var(--red)}
   .g-plaque{position:absolute;left:16px;bottom:16px;background:var(--glass);border:1px solid var(--line);border-radius:12px;
     padding:10px 14px;font:12.5px/1.7 ui-monospace,Menlo,monospace;color:var(--dim)}
   .g-plaque b{color:var(--ink)}
@@ -141,6 +154,7 @@
 <div class="lid" id="lidT"></div><div class="lid" id="lidB"></div>
 <div id="black"></div>
 <div id="plane">✈️</div>
+<div id="key" aria-hidden="true"><svg viewBox="0 0 120 60"><g fill="none" stroke="#f2b441" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="30" r="15"/><path d="M39 30h68M88 30v16M104 30v12"/></g><circle cx="24" cy="30" r="5" fill="#0d1118"/></svg></div>
 
 <div id="pause" class="overlay hidden"><div><p>Paused</p><small>Click to keep going</small></div></div>
 

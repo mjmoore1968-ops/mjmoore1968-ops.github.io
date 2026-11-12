@@ -10,6 +10,7 @@ export const GAMES = {
   lacrosse: { title: 'Lacrosse Range', lower: false, fmt: s => `${s} pts` },
   rocket:   { title: 'Booster Landing', lower: false, fmt: s => `${s} pts` },
   parkour:  { title: 'Market Parkour', lower: true,  fmt: s => `${(s / 1000).toFixed(2)}s` },
+  golf:     { title: 'Story St. Golf Club', lower: true, fmt: s => `${s} strokes` },
 };
 
 export const isGlobal = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);

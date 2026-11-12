@@ -1,6 +1,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { createLacrosse, createRocket, createParkour, makeLacrosseStick, VEHICLES } from './games.js';
 import * as LB from './leaderboard.js';
+import { createGolf } from './golf.js';
 
 const LINKS = {
   email: 'mmoore@college.harvard.edu',
@@ -494,7 +495,7 @@ document.addEventListener('pointerlockchange', () => {
   if (locked()) { setPaused(false); return; }
   if (leaving) { leaving = false; return; }
   if (S.mode === 'game') exitGame(true);
-  else if (S.mode === 'world') setPaused(true);
+  else if (S.mode === 'world' || S.mode === 'outside') setPaused(true);
 });
 $('pause').addEventListener('click', () => { setPaused(false); lock(); });
 
@@ -562,16 +563,16 @@ function blackout() {
 /* ------------------------------------------------------------------ panels */
 let panelClose = null;
 function openPanel(html, onClose) {
-  S.mode = 'panel'; panelClose = onClose || null;
+  panelFrom = S.mode === 'outside' ? 'outside' : 'world'; S.mode = 'panel'; panelClose = onClose || null;
   for (const k in keys) keys[k] = false; stick.f = stick.s = 0;
   $('panelBody').innerHTML = html; $('panel').classList.remove('hidden');
   $('prompt').classList.add('hidden'); $('controls').classList.remove('show'); setPaused(false); unlock(); touchUI();
 }
 function closePanel() {
   if (S.mode !== 'panel') return;
-  $('panel').classList.add('hidden'); S.mode = 'world';
+  $('panel').classList.add('hidden'); S.mode = panelFrom;
   if (panelClose) panelClose(); panelClose = null;
-  showWorldHud(true); wobbleFilter(); lock();
+  showWorldHud(panelFrom !== 'outside'); wobbleFilter(); lock();
 }
 $('back').addEventListener('click', closePanel);
 
@@ -604,8 +605,60 @@ function openLink(url) {
 }
 function openLinkedIn() { openLink(LINKS.linkedin); }
 function tryFrontDoor() {
-  if (!S.hasKey) { toast('🔒 Locked. There must be a key around here somewhere.', 2600); return; }
-  toast('The key fits. (Outside is coming soon.)', 2600);
+  if (!S.hasKey) { toast('🔒 Locked. Word is the key goes to whoever can score a lacrosse goal after five beers.', 4200); return; }
+  goOutside();
+}
+
+/* ------------------------------------------------------------------ the key, and the world outside */
+let golf = null, panelFrom = 'world';
+function awardKey() {
+  if (S.hasKey) return;
+  S.hasKey = true; const k = $('key'); k.className = 'pop'; setTimeout(() => (k.className = 'dock'), 1800);
+  toast('🔑 You won the front door key!', 3600);
+}
+function fadeThrough(mid) {
+  const b = $('black'); b.style.transition = 'opacity .35s ease'; b.style.opacity = 1;
+  setTimeout(() => { mid(); b.style.opacity = 0; }, 380);
+}
+function goOutside() {
+  fadeThrough(() => {
+    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drinks: () => S.drinks,
+      fade() { const b = $('black'); b.style.transition = 'none'; b.style.opacity = 1; requestAnimationFrame(() => { b.style.transition = 'opacity .7s ease'; b.style.opacity = 0; }); } });
+    golf.camera.aspect = innerWidth / innerHeight; golf.camera.updateProjectionMatrix();
+    golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter();
+  });
+}
+function goInside() {
+  fadeThrough(() => { S.mode = 'world'; S.pos.set(13.3, 1.62, 3.9); S.yaw = 0; S.pitch = 0; lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); wobbleFilter(); });
+}
+function golfFinish(r) {
+  const total = r.card.reduce((a, v) => a + v, 0), par = r.pars.reduce((a, v) => a + v, 0), d = total - par;
+  let saved = ''; try { saved = localStorage.getItem('mmjr.name') || ''; } catch { /* ignore */ }
+  const cell = (v, p) => `<td class="${v < p ? 'under' : v > p ? 'over' : ''}">${v}</td>`;
+  openPanel(`
+    <h2>Story St. Golf Club</h2>
+    <div class="big">${total} <span style="font-size:24px">(${d === 0 ? 'even' : d > 0 ? '+' + d : d})</span></div>
+    <table class="card"><tr><th>Hole</th>${r.pars.map((_, i) => `<td>${i + 1}</td>`).join('')}<td>Out</td></tr>
+      <tr><th>Par</th>${r.pars.map(p => `<td>${p}</td>`).join('')}<td>${par}</td></tr>
+      <tr><th>You</th>${r.card.map((v, i) => cell(v, r.pars[i])).join('')}<td>${total}</td></tr></table>
+    <form id="scoreForm" class="row" style="justify-content:flex-start;align-items:flex-end">
+      <div style="flex:1;min-width:160px"><label for="pName">Name for the leaderboard</label>
+      <input id="pName" maxlength="12" value="${esc(saved)}" placeholder="Your name" autocomplete="off"></div>
+      <button class="btn" type="submit">Post score</button>
+    </form>
+    <ul class="board" id="resBoard" style="margin-top:16px;font-size:14px"></ul>
+    <div class="row" style="justify-content:flex-start;margin-top:16px"><button class="btn small" id="again">Play another round</button></div>`);
+  fillBoard('golf', $('resBoard'), 8);
+  $('again').addEventListener('click', () => { closePanel(); golf.reset(); });
+  $('scoreForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const nm = LB.cleanName($('pName').value);
+    try { localStorage.setItem('mmjr.name', nm); } catch { /* ignore */ }
+    $('scoreForm').innerHTML = '<p style="margin:0">Posting…</p>';
+    const ok = await LB.submit('golf', nm, total);
+    $('scoreForm').innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
+    fillBoard('golf', $('resBoard'), 8);
+  });
 }
 function openInstagram() {
   const b = $('black'); b.style.transition = 'none'; b.style.background = '#fff'; b.style.opacity = 0.9;       // camera flash
@@ -654,6 +707,7 @@ const ctx = {
   keys, axes, touch: TOUCH,
   hud(html) { if (html !== lastHud) { lastHud = html; $('ghud').innerHTML = html; } },
   finish(result) { showResult(activeName, result); },
+  onGoal() { if (!S.hasKey && S.drinks >= 5) awardKey(); },
 };
 function startGame(name, opt = {}) {
   disposeGame();
@@ -716,31 +770,34 @@ addEventListener('keydown', e => {
     else if (S.mode === 'game') exitGame(true);
     else if (S.paused) { if (e.code === 'KeyE') { setPaused(false); lock(); } }
     else if (S.mode === 'world' && e.code === 'KeyE') use();
+    else if (S.mode === 'outside' && e.code === 'KeyE') golf.use();
   } else if (e.code === 'Space' && S.mode === 'game') active?.down?.('key');
+  else if (e.code === 'Space' && S.mode === 'outside' && !S.paused) golf.down('key');
 });
-addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Space' && S.mode === 'game') active?.up?.('key'); });
+addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Space') { if (S.mode === 'game') active?.up?.('key'); else if (S.mode === 'outside') golf.up(); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 document.addEventListener('mousemove', e => { if (locked()) look(e.movementX, e.movementY); });
 function look(dx, dy) {
   if (S.mode === 'game') { active?.look?.(dx, dy); return; }
+  if (S.mode === 'outside') { if (!S.paused) golf.look(dx, dy); return; }
   if (S.mode !== 'world' || S.paused) return;
   S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.45, 1.45);
 }
 canvas.addEventListener('mousedown', e => {
   if (TOUCH || e.button !== 0) return;
   if (S.mode === 'game') { if (locked() || FREE) active?.down?.('mouse'); else lock(); return; }
+  if (S.mode === 'outside') { if (S.paused) return; if (locked() || FREE) golf.down('mouse'); else lock(); return; }
   if ((S.mode === 'world' || S.mode === 'waking') && !S.paused) { if (locked() || FREE) use(); else lock(); }
 });
-addEventListener('mouseup', e => { if (e.button === 0 && S.mode === 'game') active?.up?.('mouse'); });
+addEventListener('mouseup', e => { if (e.button !== 0) return; if (S.mode === 'game') active?.up?.('mouse'); else if (S.mode === 'outside') golf.up(); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 /* ------------------------------------------------------------------ input: touch (joystick + drag look + action button) */
 const tu = { joy: null, look: null };
 function touchUI() {
   const el = $('touch'); if (!el) return;
-  const on = TOUCH && (S.mode === 'world' || S.mode === 'game' || S.mode === 'waking');
+  const on = TOUCH && (S.mode === 'world' || S.mode === 'game' || S.mode === 'waking' || S.mode === 'outside');
   el.classList.toggle('hidden', !on);
-  $('tExit').classList.toggle('hidden', S.mode !== 'game');
 }
 if (TOUCH) {
   const el = document.createElement('div'); el.id = 'touch'; el.className = 'hidden';
@@ -758,7 +815,7 @@ if (TOUCH) {
     #tAct:active{filter:brightness(1.15)}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
-    .g-wind{top:60px;left:12px;font-size:12px} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
+    .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-tip{display:none} .g-bar.golf{width:240px;bottom:150px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
     .g-top{top:12px;max-width:96vw;flex-wrap:wrap;justify-content:center} .pill{font-size:12.5px;padding:6px 10px} .g-bar{bottom:150px;width:200px} .g-msg{font-size:22px;white-space:normal;width:86vw}
     .g-band{width:220px} #controls{white-space:normal;width:80vw}`;
   document.head.appendChild(css);
@@ -795,14 +852,15 @@ if (TOUCH) {
         const L = tu.look; tu.look = null;
         const tap = Math.hypot(t.clientX - L.x0, t.clientY - L.y0) < 12 && performance.now() - L.t0 < 320;
         if (tap && S.mode === 'world') use(t.clientX, t.clientY);
+        else if (tap && S.mode === 'outside' && golf.S.state === 'foot') golf.use();
       }
     }
   };
   canvas.addEventListener('touchend', end); canvas.addEventListener('touchcancel', end);
   const act = $('tAct');
-  act.addEventListener('touchstart', e => { e.preventDefault(); if (S.mode === 'game') active?.down?.('btn'); else if (S.mode === 'world') use(); }, { passive: false });
-  act.addEventListener('touchend', e => { e.preventDefault(); if (S.mode === 'game') active?.up?.('btn'); }, { passive: false });
-  $('tExit').addEventListener('click', () => exitGame(true));
+  act.addEventListener('touchstart', e => { e.preventDefault(); if (S.mode === 'game') active?.down?.('btn'); else if (S.mode === 'outside') golf.down('btn'); else if (S.mode === 'world') use(); }, { passive: false });
+  act.addEventListener('touchend', e => { e.preventDefault(); if (S.mode === 'game') active?.up?.('btn'); else if (S.mode === 'outside') golf.up(); }, { passive: false });
+  $('tExit').addEventListener('click', () => { if (S.mode === 'outside') golf.back(); else exitGame(true); });
 }
 
 /* ------------------------------------------------------------------ interaction */
@@ -874,7 +932,7 @@ function updateWorld(dt) {
 /* ------------------------------------------------------------------ loop */
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight, false);
-  for (const c of [camera, active?.camera]) if (c) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); }
+  for (const c of [camera, active?.camera, golf?.camera]) if (c) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); }
 });
 let last = performance.now();
 function frame(now) {
@@ -882,12 +940,18 @@ function frame(now) {
   if (S.mode === 'game' && active) {
     if (!S.paused) active.update(dt);
     renderer.render(active.scene, active.camera);
+  } else if (golf && (S.mode === 'outside' || (S.mode === 'panel' && panelFrom === 'outside'))) {
+    if (S.mode === 'outside' && !S.paused) golf.update(dt);
+    renderer.render(golf.scene, golf.camera);
   } else { updateWorld(dt); renderer.render(scene, camera); }
   // "click to look" hint whenever the mouse is free but you are walking or playing
-  const hint = !FREE && !locked() && !S.paused && (S.mode === 'world' || S.mode === 'game') && !$('controls').classList.contains('show');
+  const hint = !FREE && !locked() && !S.paused && (S.mode === 'world' || S.mode === 'game' || S.mode === 'outside') && !$('controls').classList.contains('show');
   $('clickhint').classList.toggle('hidden', !hint);
   if (hint) $('clickhint').textContent = S.mode === 'game' ? 'Click to play' : 'Click to look around';
-  if (TOUCH) { const lb = S.mode === 'game' ? (active?.label || 'GO') : 'USE'; if (lb !== lastLabel) { lastLabel = lb; $('tAct').textContent = lb; } }
+  if (TOUCH) {
+    const lb = S.mode === 'game' ? (active?.label || 'GO') : S.mode === 'outside' ? golf.label : 'USE'; if (lb !== lastLabel) { lastLabel = lb; $('tAct').textContent = lb; }
+    $('tExit').classList.toggle('hidden', !(S.mode === 'game' || (S.mode === 'outside' && golf.canBack)));
+  }
   requestAnimationFrame(frame);
 }
 // first visit: you are simply standing in the bedroom. The wake-up blink only plays after a blackout.
@@ -896,4 +960,4 @@ S.mode = 'world'; S.pos.copy(BED.stand); S.yaw = -Math.PI / 2 - 0.25; S.pitch = 
 S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
 requestAnimationFrame(frame);
 
-if (TEST) window.__g = { S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
+if (TEST) window.__g = { awardKey, goOutside, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
