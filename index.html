@@ -81,17 +81,26 @@
   #cross.hot{background:var(--amber);transform:scale(1.7)}
   #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);
     padding:8px 14px;border-radius:999px;font-size:14px;white-space:nowrap}
-  #drinks{position:absolute;right:16px;top:14px;background:var(--glass);border:1px solid var(--line);padding:6px 12px;border-radius:999px;font-size:14px}
   #toast{position:absolute;left:50%;top:18%;transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);
     padding:9px 16px;border-radius:12px;font-size:15px;opacity:0;transition:opacity .25s}
   #toast.show{opacity:1}
-  #tips{position:absolute;left:16px;bottom:14px;color:rgba(255,255,255,.7);font-size:12.5px;text-shadow:0 1px 3px #000}
+  #clickhint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);
+    padding:7px 14px;border-radius:999px;font-size:13.5px}
+  #controls{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--glass);border:1px solid var(--line);
+    border-radius:16px;padding:18px 24px;text-align:center;opacity:0;transition:opacity .9s ease;line-height:2;font-size:15px;white-space:nowrap}
+  #controls.show{opacity:1;transition:opacity .3s ease}
+  #controls b{display:block;font:700 20px Georgia,serif;margin-bottom:4px}
   #ghud{position:absolute;inset:0}
   .g-top{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:10px;font-variant-numeric:tabular-nums}
   .pill{background:var(--glass);border:1px solid var(--line);padding:7px 14px;border-radius:999px;font-size:15px;font-weight:600;white-space:nowrap}
-  .g-msg{position:absolute;left:50%;top:26%;transform:translateX(-50%);font:700 30px Georgia,serif;text-shadow:0 2px 10px #000;white-space:nowrap}
+  .g-msg{position:absolute;left:50%;top:26%;transform:translateX(-50%);font:700 30px Georgia,serif;text-shadow:0 2px 10px #000;white-space:nowrap;text-align:center}
+  .g-msg small{display:block;font:500 15px ui-sans-serif,system-ui,sans-serif;margin-top:6px;opacity:.9}
+  .g-band{position:relative;width:320px;height:12px;border-radius:8px;background:rgba(0,0,0,.5);border:1px solid var(--line)}
+  .g-band span{position:absolute;top:0;bottom:0;background:rgba(53,194,122,.75)}
+  .g-band i{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1px;background:#fff;border-radius:2px}
+  .g-bar.hot i{background:var(--green)} .g-bar b{position:absolute;right:0;top:0;bottom:0;width:15%;border-left:2px solid rgba(255,255,255,.7)}
   .g-exit{position:absolute;left:16px;top:14px;color:rgba(255,255,255,.75);font-size:12.5px;text-shadow:0 1px 3px #000}
-  .g-bar{position:absolute;left:50%;bottom:60px;transform:translateX(-50%);width:260px;height:12px;border-radius:8px;
+  .g-bar{position:absolute;left:50%;bottom:60px;position:absolute;transform:translateX(-50%);width:260px;height:12px;border-radius:8px;
     background:rgba(0,0,0,.45);border:1px solid var(--line);overflow:hidden}
   .g-bar i{display:block;height:100%;background:var(--amber)}
   .g-side{position:absolute;right:16px;top:60px;background:var(--glass);border:1px solid var(--line);border-radius:12px;
@@ -121,9 +130,9 @@
 <div id="hud" class="hidden">
   <div id="cross"></div>
   <div id="prompt" class="hidden"></div>
-  <div id="drinks" class="hidden"></div>
   <div id="toast"></div>
-  <div id="tips"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · mouse look · <kbd>E</kbd> or click to use · <kbd>Esc</kbd> pause</div>
+  <div id="clickhint" class="hidden">Click to look around</div>
+  <div id="controls"></div>
   <div id="ghud" class="hidden"></div>
 </div>
 
@@ -131,24 +140,7 @@
 <div id="black"></div>
 <div id="plane">✈️</div>
 
-<div id="start" class="overlay">
-  <div class="card">
-    <h1>Matthew Moore Jr.</h1>
-    <p class="sub">Come on in. Walk around my apartment, play a few games, say hello.</p>
-    <div class="row">
-      <button class="btn" id="wakeBtn">Wake up</button>
-      <button class="btn ghost" id="skipBtn">Skip — just the links</button>
-    </div>
-    <div class="keys">
-      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span>
-      <span>Mouse to look</span>
-      <span><kbd>E</kbd> or click to use</span>
-      <span><kbd>E</kbd> / <kbd>Esc</kbd> to close</span>
-    </div>
-  </div>
-</div>
-
-<div id="pause" class="overlay hidden"><div><p>Click to keep exploring</p><small>or press Esc again to free your mouse</small></div></div>
+<div id="pause" class="overlay hidden"><div><p>Paused</p><small>Click to keep going</small></div></div>
 
 <div id="panel" class="overlay hidden">
   <div class="box">
@@ -167,7 +159,6 @@
       <a href="https://www.linkedin.com/in/matthew-moore-b4b3ba327" target="_blank" rel="noopener">LinkedIn<span>linkedin.com/in/matthew-moore-b4b3ba327</span></a>
       <a href="https://www.instagram.com/matthew.moore04/" target="_blank" rel="noopener">Instagram<span>@matthew.moore04</span></a>
     </div>
-    <button class="btn ghost small" id="enterBtn">Explore the 3D apartment</button>
     <p class="sub" id="liteNote" style="margin-top:14px;font-size:13px"></p>
   </div>
 </div>
