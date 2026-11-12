@@ -315,13 +315,13 @@ function tombstone(parent, name, x, y, z, s) {
   plane(scene, 1.8, 0.42, st, 36.4, 2.2, -5.955, 0);
 
   /* --- mailbox --- */
-  const mb = group(37.2, 0, 3.9); mb.rotation.y = Math.PI;
+  const mb = group(37.2, 0, 5.62); mb.rotation.y = Math.PI;
   box(mb, 0.1, 1.05, 0.1, 0x6b4a2f, 0, 0.525, 0);
   box(mb, 0.3, 0.2, 0.56, 0x2a4b8d, 0, 1.15, 0);
   cyl(mb, 0.15, 0.15, 0.56, 0x2a4b8d, 0, 1.25, 0, 20).rotation.x = Math.PI / 2;
   box(mb, 0.02, 0.22, 0.04, 0xd64545, 0.165, 1.33, -0.1); box(mb, 0.02, 0.1, 0.14, 0xd64545, 0.165, 1.42, -0.05);
   plane(mb, 0.26, 0.12, sign('MAIL', 0.26, 0.12, '#2a4b8d', '#ffffff', 'Georgia, serif', false), 0, 1.16, 0.285, 0, false);
-  col(37.2, 3.9, 0.5, 0.5);
+  col(37.2, 5.62, 0.5, 0.6);
   interact(mb, 'Send me a message', openEmail);
 
   /* --- front door to outside: locked until the key is found (the key comes later) --- */
