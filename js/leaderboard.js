@@ -1,8 +1,8 @@
 // Leaderboard. Global scores use a free Supabase project (REST API).
 // Until the two values below are filled in, scores are kept on this device only.
 export const CONFIG = {
-  supabaseUrl: '',   // e.g. 'https://abcdefgh.supabase.co'
-  supabaseKey: '',   // the project's public "anon" key
+  supabaseUrl: 'https://fdrsfxkzxhqftccibpbd.supabase.co',
+  supabaseKey: 'sb_publishable_KDwn6qN_w1O6oF0uFImD8w_wzC9-1T5',   // public key: safe in browser code, limited by row-level security
 };
 
 // lowerIsBetter: parkour is a time trial
@@ -14,6 +14,8 @@ export const GAMES = {
 };
 
 export const isGlobal = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
+// publishable keys go in the apikey header only; legacy JWT anon keys also need a Bearer header
+const authHeaders = () => (CONFIG.supabaseKey.startsWith('sb_') ? { apikey: CONFIG.supabaseKey } : { apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` });
 
 const BLOCK = ['fuck','shit','bitch','cunt','nigg','fag','dick','cock','pussy','whore','slut','rape','nazi','hitler','penis','vagina','asshole','bastard','retard','kike','spic','chink','twat','wank','porn','sex'];
 const LEET = { '0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','8':'b','@':'a','$':'s','!':'i' };
@@ -41,7 +43,7 @@ export async function top(game, n = 5) {
     try {
       const order = GAMES[game].lower ? 'score.asc' : 'score.desc';
       const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/scores?select=name,score&game=eq.${game}&order=${order}&limit=${n}`, {
-        headers: { apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` },
+        headers: authHeaders(),
       });
       if (r.ok) return await r.json();
     } catch { /* fall through to local */ }
@@ -59,7 +61,7 @@ export async function submit(game, name, score) {
     try {
       const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/scores`, {
         method: 'POST',
-        headers: { apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify(row),
       });
       return r.ok;
