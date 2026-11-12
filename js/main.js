@@ -185,8 +185,8 @@ const DOOR = { z0: 0.75, z1: 1.85, x: 3.6, open: false, t: 0, group: null, col: 
   for (let i = 0; i < 3; i++) for (const s of [-0.42, 0.42]) box(scene, 0.72, 0.24, 0.02, 0x7d5a3c, 1.4 + s, 0.2 + i * 0.29, -2.44);
   box(scene, 0.5, 0.36, 0.04, 0x222831, 1.0, 1.15, -2.8);
   cyl(scene, 0.07, 0.07, 0.2, 0x9aa8b5, 1.9, 1.05, -2.7);
-  cyl(scene, 1.25, 1.25, 0.02, 0xb9a48a, 0.4, 0.011, 0.5, 32);
-  cyl(scene, 1.0, 1.0, 0.022, 0xd9c9ae, 0.4, 0.012, 0.5, 32);
+  cyl(scene, 1.25, 1.25, 0.02, 0xb9a48a, 0.4, 0.01, 0.5, 32);
+  cyl(scene, 1.0, 1.0, 0.02, 0xd9c9ae, 0.4, 0.024, 0.5, 32);
   windowPane(-0.8, 1.55, 2.98, Math.PI);
   box(scene, 0.03, 0.9, 0.7, 0x24344d, -3.48, 1.6, 0.8); box(scene, 0.035, 0.74, 0.54, 0xe9c46a, -3.47, 1.6, 0.8);
   plant(-3.0, 2.5);
@@ -203,7 +203,7 @@ const DOOR = { z0: 0.75, z1: 1.85, x: 3.6, open: false, t: 0, group: null, col: 
   // living-room face
   seg(x + 0.05, -5, z0, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z1, 5, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z0, z1, DH, 3.2, 0xe7e0d3);
   col(x, (-6.5 + z0) / 2, 0.2, z0 + 6.5); col(x, (z1 + 6.5) / 2, 0.2, 6.5 - z1);
-  box(scene, 0.22, 0.02, z1 - z0, 0x5d4632, x, 0.005, (z0 + z1) / 2);                       // threshold
+  box(scene, 0.22, 0.03, z1 - z0, 0x5d4632, x, 0.0, (z0 + z1) / 2);                       // threshold
   // trim on both faces
   for (const s of [-1, 1]) {
     box(scene, 0.03, DH + 0.08, 0.09, 0xf5f1e8, x + s * 0.11, (DH + 0.08) / 2, z0 - 0.045); box(scene, 0.03, DH + 0.08, 0.09, 0xf5f1e8, x + s * 0.11, (DH + 0.08) / 2, z1 + 0.045);
@@ -248,7 +248,7 @@ function tombstone(parent, name, x, y, z, s) {
   MX = x => x + LIV; MZ = z => z;
   room(38.5, 0, 13, 10, 3.2, 0x9b7b58, 0xe7e0d3, 0xf5f2ec, 'nx');
   box(scene, 0.03, 0.1, 5.75, 0xf5f1e8, 32.015, 0.05, -2.125); box(scene, 0.03, 0.1, 3.15, 0xf5f1e8, 32.015, 0.05, 3.425);
-  box(scene, 0.02, 3.2, 10, 0x24344d, 44.98, 1.6, 0);            // accent wall behind the TV
+  box(scene, 0.02, 3.1, 10, 0x24344d, 44.98, 1.65, 0);            // accent wall behind the TV
   MX = x => (x >= 44 ? x - 3 : 32 + (x - 32) * 0.75) + LIV; MZ = z => (Math.abs(z) > 4 ? z - Math.sign(z) : z * 0.75);
   for (const [x, z] of [[36, -2.5], [36, 2.5], [44, -2.5], [44, 2.5]]) {
     lamp(x, 2.1, z, 9);
@@ -278,7 +278,7 @@ function tombstone(parent, name, x, y, z, s) {
   box(scene, 0.8, 0.14, 1.12, 0x5c7d8b, 44.28, 0.49, -0.6); box(scene, 0.8, 0.14, 1.12, 0x5c7d8b, 44.28, 0.49, 0.6);
   box(scene, 0.16, 0.36, 0.4, 0xe9c46a, 43.95, 0.72, -0.8);
   col(44.1, 0, 1.1, 2.9);
-  box(scene, 3.6, 0.02, 3.8, 0x8d5b4c, 45.6, 0.011, 0); box(scene, 3.2, 0.022, 3.4, 0xb9836f, 45.6, 0.012, 0);
+  box(scene, 3.6, 0.02, 3.8, 0x8d5b4c, 45.6, 0.01, 0); box(scene, 3.2, 0.02, 3.4, 0xb9836f, 45.6, 0.024, 0);
   box(scene, 0.6, 0.06, 1.3, 0x6b4a2f, 45.75, 0.4, 0); col(45.75, 0, 0.6, 1.3);
   for (const [dx, dz] of [[-.25, -.58], [.25, -.58], [-.25, .58], [.25, .58]]) box(scene, 0.05, 0.38, 0.05, 0x333333, 45.75 + dx, 0.19, dz);
   for (const dz of [-0.3, 0.25]) { box(scene, 0.11, 0.035, 0.17, 0x1a1c22, 45.75, 0.448, dz); sph(scene, 0.015, 0xdddddd, 45.72, 0.47, dz + 0.04); }
@@ -331,7 +331,7 @@ function tombstone(parent, name, x, y, z, s) {
   sph(fd, 0.05, 0xd9b34a, -0.38, 1.02, -0.08); cyl(fd, 0.04, 0.04, 0.03, 0xd9b34a, -0.38, 1.2, -0.055, 14).rotation.x = Math.PI / 2;   // knob + deadbolt
   box(fd, 0.012, 0.035, 0.01, 0x222222, -0.38, 1.2, -0.073);                                                                    // keyhole
   box(fd, 0.08, 2.2, 0.1, 0xf5f1e8, -0.54, 1.1, 0); box(fd, 0.08, 2.2, 0.1, 0xf5f1e8, 0.54, 1.1, 0); box(fd, 1.16, 0.08, 0.1, 0xf5f1e8, 0, 2.18, 0);
-  box(fd, 0.9, 0.02, 0.5, 0x4a5a3a, 0, 0.011, -0.33);                                                                           // doormat
+  box(fd, 0.9, 0.02, 0.5, 0x4a5a3a, 0, 0.01, -0.33);                                                                           // doormat
   plane(fd, 0.62, 0.2, sign('OUTSIDE', 0.62, 0.2, '#f5f1e8', '#3a3024', 'Georgia, serif', false), 0, 2.36, -0.06, Math.PI);
   interact(fd, 'Front door', tryFrontDoor);
 
@@ -411,23 +411,32 @@ function tombstone(parent, name, x, y, z, s) {
   box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 36.78, 0.55, 3.9); box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 37.62, 0.55, 3.9); col(37.2, 3.95, 0.95, 1.0);
   cyl(scene, 0.3, 0.3, 0.04, 0x6b4a2f, 38.3, 0.5, 4.2, 20); cyl(scene, 0.03, 0.03, 0.5, 0x333333, 38.3, 0.25, 4.2, 8); col(38.3, 4.2, 0.5, 0.5);
 
-  /* --- a friend sitting in the armchair: brown swept-up hair, navy suit and tie. Click to visit his site. --- */
+  /* --- a friend sitting in the armchair: brown swept-up hair, red flannel and jeans. Click to visit his site. --- */
   const guy = group(37.2, 0, 3.9);
-  const skin = 0xf0c8a6, suitC = 0x1a2238, hairC = 0x5b3f2a, tieC = 0x27408f;
+  const skin = 0xf0c8a6, hairC = 0x5b3f2a, jeans = 0x3d5f93;
+  const plaid = tex(128, 128, (c, W, H) => {
+    c.fillStyle = '#b3262a'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(20,16,18,.55)'; for (let i = 0; i < 4; i++) { c.fillRect(i * 32 + 4, 0, 12, H); c.fillRect(0, i * 32 + 4, W, 12); }
+    c.fillStyle = 'rgba(20,16,18,.5)'; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) c.fillRect(i * 32 + 4, j * 32 + 4, 12, 12);
+    c.fillStyle = 'rgba(255,235,220,.35)'; for (let i = 0; i < 4; i++) { c.fillRect(i * 32 + 23, 0, 2, H); c.fillRect(0, i * 32 + 23, W, 2); }
+  });
+  const flannel = new THREE.MeshLambertMaterial({ map: plaid });
   for (const sx of [-1, 1]) {
-    box(guy, 0.15, 0.14, 0.44, suitC, sx * 0.1, 0.48, -0.2);                             // thighs
-    box(guy, 0.13, 0.42, 0.13, suitC, sx * 0.1, 0.23, -0.42);                            // shins
-    box(guy, 0.13, 0.07, 0.25, 0x3a2416, sx * 0.1, 0.035, -0.47);                        // shoes
-    box(guy, 0.11, 0.3, 0.13, suitC, sx * 0.25, 0.93, 0.07).rotation.z = sx * 0.12;      // upper arms
-    box(guy, 0.1, 0.09, 0.3, suitC, sx * 0.3, 0.75, -0.08);                              // forearms on the armrests
-    box(guy, 0.105, 0.02, 0.03, 0xf4f1ea, sx * 0.3, 0.75, -0.235);                       // shirt cuffs
+    box(guy, 0.15, 0.14, 0.44, jeans, sx * 0.1, 0.48, -0.2);                             // thighs
+    box(guy, 0.13, 0.42, 0.13, jeans, sx * 0.1, 0.23, -0.42);                            // shins
+    box(guy, 0.135, 0.04, 0.135, 0x4a6ea6, sx * 0.1, 0.07, -0.42);                       // cuffed hems
+    box(guy, 0.13, 0.07, 0.25, 0x6b4a2f, sx * 0.1, 0.035, -0.47);                        // boots
+    box(guy, 0.11, 0.3, 0.13, flannel, sx * 0.25, 0.93, 0.07).rotation.z = sx * 0.12;    // upper arms
+    box(guy, 0.1, 0.09, 0.3, flannel, sx * 0.3, 0.75, -0.08);                            // forearms on the armrests
     sph(guy, 0.05, skin, sx * 0.3, 0.75, -0.27);                                         // hands
-    box(guy, 0.1, 0.34, 0.02, 0x222c47, sx * 0.09, 0.93, -0.036).rotation.z = sx * 0.2;  // lapels
+    box(guy, 0.08, 0.06, 0.03, flannel, sx * 0.055, 1.1, -0.03).rotation.z = -sx * 0.5;  // collar points
   }
-  box(guy, 0.4, 0.52, 0.22, suitC, 0, 0.8, 0.08); box(guy, 0.46, 0.1, 0.24, suitC, 0, 1.06, 0.08);   // torso + shoulders
-  box(guy, 0.12, 0.34, 0.02, 0xf4f1ea, 0, 0.93, -0.034);                                 // shirt
-  box(guy, 0.05, 0.3, 0.02, tieC, 0, 0.9, -0.042); box(guy, 0.06, 0.05, 0.024, tieC, 0, 1.07, -0.042);
-  for (const sx of [-1, 1]) box(guy, 0.07, 0.05, 0.03, 0xf4f1ea, sx * 0.045, 1.1, -0.03).rotation.z = -sx * 0.5;   // collar points
+  box(guy, 0.4, 0.52, 0.22, flannel, 0, 0.8, 0.08); box(guy, 0.46, 0.1, 0.24, flannel, 0, 1.06, 0.08);   // torso + shoulders
+  box(guy, 0.025, 0.46, 0.012, 0x7d181b, 0, 0.83, -0.034);                               // button placket
+  for (let i = 0; i < 4; i++) cyl(guy, 0.009, 0.009, 0.008, 0xf4f1ea, 0, 0.66 + i * 0.11, -0.042, 8).rotation.x = Math.PI / 2;
+  box(guy, 0.09, 0.07, 0.012, 0xf4f1ea, 0, 1.075, -0.031);                               // white tee at the collar
+  box(guy, 0.1, 0.1, 0.012, flannel, 0.11, 0.93, -0.034);                                // chest pocket
+  box(guy, 0.41, 0.04, 0.225, 0x3a2416, 0, 0.55, 0.08);                                  // belt
   cyl(guy, 0.055, 0.06, 0.1, skin, 0, 1.14, 0.06, 12);                                   // neck
   const head = group(0, 1.19, 0.06, guy);
   box(head, 0.2, 0.25, 0.21, skin, 0, 0.125, 0);                                         // face
@@ -504,8 +513,8 @@ let controlsTimer;
 function showControls() {
   const c = $('controls');
   c.innerHTML = TOUCH
-    ? '<b>Good morning</b>Left stick to move · drag to look<br>Tap things, or press USE'
-    : '<b>Good morning</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to move · mouse to look<br><kbd>E</kbd> or click to use · <kbd>E</kbd> / <kbd>Esc</kbd> to close<br>Click once to look around';
+    ? '<b>Welcome</b>Left stick to move · drag to look<br>Tap things, or press USE'
+    : '<b>Welcome</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to move · mouse to look<br><kbd>E</kbd> or click to use · <kbd>E</kbd> / <kbd>Esc</kbd> to close<br>Click once to look around';
   c.classList.add('show'); clearTimeout(controlsTimer); controlsTimer = setTimeout(() => c.classList.remove('show'), 3000);
 }
 
@@ -876,7 +885,10 @@ function frame(now) {
   if (TOUCH) { const lb = S.mode === 'game' ? (active?.label || 'GO') : 'USE'; if (lb !== lastLabel) { lastLabel = lb; $('tAct').textContent = lb; } }
   requestAnimationFrame(frame);
 }
-showWorldHud(true); wake();
+// first visit: you are simply standing in the bedroom. The wake-up blink only plays after a blackout.
+showWorldHud(true);
+S.mode = 'world'; S.pos.copy(BED.stand); S.yaw = -Math.PI / 2 - 0.25; S.pitch = -0.05; S.roll = 0;
+S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
 requestAnimationFrame(frame);
 
 if (TEST) window.__g = { S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
