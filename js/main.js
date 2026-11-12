@@ -315,13 +315,13 @@ function tombstone(parent, name, x, y, z, s) {
   plane(scene, 1.8, 0.42, st, 36.4, 2.2, -5.955, 0);
 
   /* --- mailbox --- */
-  const mb = group(33.4, 0, 4.9); mb.rotation.y = Math.PI * 0.75;
+  const mb = group(37.2, 0, 3.9); mb.rotation.y = Math.PI;
   box(mb, 0.1, 1.05, 0.1, 0x6b4a2f, 0, 0.525, 0);
   box(mb, 0.3, 0.2, 0.56, 0x2a4b8d, 0, 1.15, 0);
   cyl(mb, 0.15, 0.15, 0.56, 0x2a4b8d, 0, 1.25, 0, 20).rotation.x = Math.PI / 2;
   box(mb, 0.02, 0.22, 0.04, 0xd64545, 0.165, 1.33, -0.1); box(mb, 0.02, 0.1, 0.14, 0xd64545, 0.165, 1.42, -0.05);
   plane(mb, 0.26, 0.12, sign('MAIL', 0.26, 0.12, '#2a4b8d', '#ffffff', 'Georgia, serif', false), 0, 1.16, 0.285, 0, false);
-  col(33.4, 4.9, 0.5, 0.5);
+  col(37.2, 3.9, 0.5, 0.5);
   interact(mb, 'Send me a message', openEmail);
 
   /* --- front door to outside: locked until the key is found (the key comes later) --- */
@@ -353,7 +353,7 @@ function tombstone(parent, name, x, y, z, s) {
   interact(suit, 'Career: open my LinkedIn', openLinkedIn);
 
   /* --- big camera on a tripod; its rear screen shows the Instagram profile it is "shooting" --- */
-  const cam = group(34.5, 0, -4.5); cam.rotation.y = Math.PI * 0.27;                    // back of the camera faces the room
+  const cam = group(33.7, 0, 4.85); cam.rotation.y = Math.PI * 0.73;                    // back of the camera faces the room
   for (let i = 0; i < 3; i++) {
     const a = i * 2.094 + 0.5, leg = cyl(cam, 0.024, 0.024, 1.3, 0x222222, Math.cos(a) * 0.25, 0.61, Math.sin(a) * 0.25, 8);
     leg.rotation.z = Math.cos(a) * 0.38; leg.rotation.x = -Math.sin(a) * 0.38;
@@ -376,11 +376,11 @@ function tombstone(parent, name, x, y, z, s) {
   igScreen = plane(cam, 0.78, 0.528, igTex, 0.06, 1.63, 0.194, 0);
   new THREE.TextureLoader().load('img/instagram.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; igScreen.material.map = t; igScreen.material.needsUpdate = true; });
   const g2 = new THREE.PointLight(0xdfe8ff, 2.4, 4, 1.8); g2.position.set(0.06, 1.63, 0.7); cam.add(g2);
-  col(34.5, -4.5, 0.95, 0.95);
+  col(33.7, 4.85, 0.95, 0.95);
   interact(cam, 'Open my Instagram', openInstagram);
 
   /* --- bookshelf, with three tiny headstone ornaments on the middle shelf --- */
-  plant(47.3, -5.3); plant(32.7, -5.3);
+  plant(47.3, -5.3);
   box(scene, 1.5, 2.0, 0.34, 0x6b4a2f, 45.2, 1.0, -5.8); col(45.2, -5.8, 1.5, 0.4);
   const bk = [0xd64545, 0xe9c46a, 0x2a9d8f, 0x264653, 0xf4a261, 0x8ecae6, 0x6d597a];
   for (let r = 0; r < 4; r++) {
@@ -406,14 +406,16 @@ function tombstone(parent, name, x, y, z, s) {
   cyl(scene, 0.16, 0.18, 0.03, 0x222222, 42.9, 0.015, 3.5); cyl(scene, 0.015, 0.015, 1.6, 0x222222, 42.9, 0.8, 3.5, 8);
   cyl(scene, 0.13, 0.2, 0.26, 0xfff0cc, 42.9, 1.68, 3.5, 16, { emissive: 0xffd68a, emissiveIntensity: 0.8 });
   col(42.9, 3.5, 0.3, 0.3);
-  // a side table and armchair so the middle of the room is not empty
-  box(scene, 0.9, 0.4, 0.9, 0xa35d4a, 37.2, 0.2, 3.9); box(scene, 0.9, 0.55, 0.22, 0xa35d4a, 37.2, 0.68, 4.3);
-  box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 36.78, 0.55, 3.9); box(scene, 0.2, 0.3, 0.9, 0xa35d4a, 37.62, 0.55, 3.9); col(37.2, 3.95, 0.95, 1.0);
-  cyl(scene, 0.3, 0.3, 0.04, 0x6b4a2f, 38.3, 0.5, 4.2, 20); cyl(scene, 0.03, 0.03, 0.5, 0x333333, 38.3, 0.25, 4.2, 8); col(38.3, 4.2, 0.5, 0.5);
 
-  /* --- a friend sitting in the armchair: brown swept-up hair, red flannel and jeans. Click to visit his site. --- */
-  const guy = group(37.2, 0, 3.9);
-  const skin = 0xf0c8a6, hairC = 0x5b3f2a, jeans = 0x3d5f93;
+  /* --- Pat, in an armchair tucked into the corner: brown swept-up hair, open red flannel jacket over a white henley, jeans --- */
+  const guy = group(33.0, 0, -5.25); guy.rotation.y = -Math.PI * 0.75;                   // chair faces out into the room
+  const chairC = 0xa35d4a;
+  box(guy, 0.9, 0.4, 0.9, chairC, 0, 0.2, 0); box(guy, 0.9, 0.55, 0.22, chairC, 0, 0.68, 0.4);
+  for (const sx of [-1, 1]) box(guy, 0.2, 0.3, 0.9, chairC, sx * 0.36, 0.55, 0);
+  cyl(guy, 0.3, 0.3, 0.04, 0x6b4a2f, -0.72, 0.5, -0.25, 20); cyl(guy, 0.03, 0.03, 0.5, 0x333333, -0.72, 0.25, -0.25, 8);   // side table
+  cyl(guy, 0.04, 0.035, 0.1, 0xf4f1ea, -0.72, 0.57, -0.25, 12);                          // a mug on it
+  { const gx = guy.position.x, gz = guy.position.z; colliders.push({ x0: gx - 0.7, x1: gx + 0.7, z0: gz - 0.7, z1: gz + 0.7 }, { x0: gx + 0.69 - 0.3, x1: gx + 0.69 + 0.3, z0: gz - 0.33 - 0.3, z1: gz - 0.33 + 0.3 }); }
+  const skin = 0xf0c8a6, hairC = 0x5b3f2a, jeans = 0x3d5f93, henley = 0xf6f3ec;
   const plaid = tex(128, 128, (c, W, H) => {
     c.fillStyle = '#b3262a'; c.fillRect(0, 0, W, H);
     c.fillStyle = 'rgba(20,16,18,.55)'; for (let i = 0; i < 4; i++) { c.fillRect(i * 32 + 4, 0, 12, H); c.fillRect(0, i * 32 + 4, W, 12); }
@@ -423,19 +425,21 @@ function tombstone(parent, name, x, y, z, s) {
   const flannel = new THREE.MeshLambertMaterial({ map: plaid });
   for (const sx of [-1, 1]) {
     box(guy, 0.15, 0.14, 0.44, jeans, sx * 0.1, 0.48, -0.2);                             // thighs
-    box(guy, 0.13, 0.42, 0.13, jeans, sx * 0.1, 0.23, -0.42);                            // shins
-    box(guy, 0.135, 0.04, 0.135, 0x4a6ea6, sx * 0.1, 0.07, -0.42);                       // cuffed hems
-    box(guy, 0.13, 0.07, 0.25, 0x6b4a2f, sx * 0.1, 0.035, -0.47);                        // boots
-    box(guy, 0.11, 0.3, 0.13, flannel, sx * 0.25, 0.93, 0.07).rotation.z = sx * 0.12;    // upper arms
+    box(guy, 0.13, 0.42, 0.13, jeans, sx * 0.1, 0.23, -0.52);                            // shins
+    box(guy, 0.135, 0.04, 0.135, 0x4a6ea6, sx * 0.1, 0.07, -0.52);                       // cuffed hems
+    box(guy, 0.13, 0.07, 0.25, 0x6b4a2f, sx * 0.1, 0.035, -0.57);                        // boots
+    box(guy, 0.11, 0.3, 0.13, flannel, sx * 0.25, 0.93, 0.07).rotation.z = sx * 0.12;    // jacket sleeves
     box(guy, 0.1, 0.09, 0.3, flannel, sx * 0.3, 0.75, -0.08);                            // forearms on the armrests
-    sph(guy, 0.05, skin, sx * 0.3, 0.75, -0.27);                                         // hands
-    box(guy, 0.08, 0.06, 0.03, flannel, sx * 0.055, 1.1, -0.03).rotation.z = -sx * 0.5;  // collar points
+    box(guy, 0.105, 0.095, 0.03, henley, sx * 0.3, 0.75, -0.235);                        // henley cuffs showing
+    sph(guy, 0.05, skin, sx * 0.3, 0.75, -0.28);                                         // hands
+    box(guy, 0.11, 0.5, 0.03, flannel, sx * 0.15, 0.81, -0.04);                          // open jacket fronts
+    box(guy, 0.09, 0.07, 0.03, flannel, sx * 0.12, 1.09, -0.035).rotation.z = -sx * 0.45;  // jacket collar
   }
-  box(guy, 0.4, 0.52, 0.22, flannel, 0, 0.8, 0.08); box(guy, 0.46, 0.1, 0.24, flannel, 0, 1.06, 0.08);   // torso + shoulders
-  box(guy, 0.025, 0.46, 0.012, 0x7d181b, 0, 0.83, -0.034);                               // button placket
-  for (let i = 0; i < 4; i++) cyl(guy, 0.009, 0.009, 0.008, 0xf4f1ea, 0, 0.66 + i * 0.11, -0.042, 8).rotation.x = Math.PI / 2;
-  box(guy, 0.09, 0.07, 0.012, 0xf4f1ea, 0, 1.075, -0.031);                               // white tee at the collar
-  box(guy, 0.1, 0.1, 0.012, flannel, 0.11, 0.93, -0.034);                                // chest pocket
+  box(guy, 0.4, 0.52, 0.22, flannel, 0, 0.8, 0.08); box(guy, 0.46, 0.1, 0.24, flannel, 0, 1.06, 0.08);   // jacket body + shoulders
+  box(guy, 0.2, 0.56, 0.02, henley, 0, 0.83, -0.036);                                    // white henley
+  box(guy, 0.035, 0.15, 0.012, 0xe2ddd2, 0, 1.01, -0.048);                               // its button placket
+  for (let i = 0; i < 3; i++) cyl(guy, 0.008, 0.008, 0.008, 0xbfb8aa, 0, 0.955 + i * 0.05, -0.056, 8).rotation.x = Math.PI / 2;
+  box(guy, 0.13, 0.025, 0.02, 0xe2ddd2, 0, 1.1, -0.036);                                 // round collar
   box(guy, 0.41, 0.04, 0.225, 0x3a2416, 0, 0.55, 0.08);                                  // belt
   cyl(guy, 0.055, 0.06, 0.1, skin, 0, 1.14, 0.06, 12);                                   // neck
   const head = group(0, 1.19, 0.06, guy);
@@ -455,7 +459,7 @@ function tombstone(parent, name, x, y, z, s) {
   const tuft = box(head, 0.2, 0.08, 0.1, hairC, 0.01, 0.305, -0.07); tuft.rotation.x = 0.45;       // front swept up
   box(head, 0.14, 0.05, 0.12, 0x6a4a32, -0.02, 0.325, 0.0).rotation.z = 0.12;
   buddy.head = head; buddy.root = guy;
-  interact(guy, 'Visit patricksliz.com', () => openLink('https://patricksliz.com/'));
+  interact(guy, 'Say hi to Pat: visit patricksliz.com', () => openLink('https://patricksliz.com/'));
 
   MX = x => x; MZ = z => z;
 })();
@@ -826,7 +830,8 @@ function updateWorld(dt) {
   if (S.mode === 'waking') updateWake(dt);
   if (DOOR.open && DOOR.t < 1) { DOOR.t = Math.min(1, DOOR.t + dt / 0.7); DOOR.group.rotation.y = ease(DOOR.t) * 1.85; }
   if (buddy.head) {                               // he watches you walk around, and breathes
-    const p = buddy.root.position, want = Math.atan2(-(S.pos.x - p.x), -(S.pos.z - p.z));
+    const p = buddy.root.position; let want = Math.atan2(-(S.pos.x - p.x), -(S.pos.z - p.z)) - buddy.root.rotation.y;
+    want = Math.atan2(Math.sin(want), Math.cos(want));
     buddy.yaw += (clamp(want, -1.1, 1.1) - buddy.yaw) * Math.min(1, dt * 3);
     buddy.head.rotation.y = buddy.yaw; buddy.head.rotation.x = Math.sin(S.t * 0.8) * 0.03;
     buddy.head.position.y = 1.19 + Math.sin(S.t * 1.6) * 0.004;
