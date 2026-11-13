@@ -507,7 +507,11 @@ function toast(msg, ms = 1800) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 // the more you drank, the blurrier everything gets (games included)
-function wobbleFilter() { canvas.style.filter = S.drinks > 0 ? `blur(${(S.drinks * (S.mode === 'game' ? 0.34 : 0.26)).toFixed(2)}px)` : ''; }
+// (the golf course is never blurred, however much you drank)
+function wobbleFilter() {
+  const outside = S.mode === 'outside' || (S.mode === 'panel' && panelFrom === 'outside');
+  canvas.style.filter = S.drinks > 0.2 && !outside ? `blur(${(S.drinks * (S.mode === 'game' ? 0.34 : 0.26)).toFixed(2)}px)` : '';
+}
 function showWorldHud(v) {
   $('hud').classList.remove('hidden');
   $('cross').classList.toggle('hidden', !v);
@@ -550,7 +554,7 @@ const SIPS = [['Cheers.', 'One more.', 'Refreshing.'], ['Feeling good.', 'Okay, 
   ['Is the room moving?', 'Who tilted the floor?', 'This is fine.'], ['Bad idea.', 'Maybe sit down.', 'The walls are breathing.']];
 function drink() {
   if (S.mode !== 'world') return;
-  S.drinks++; wobbleFilter();
+  S.drinks += 1; wobbleFilter();
   if (S.drinks >= S.limit) { toast('Goodnight.', 2000); blackout(); return; }
   const tier = SIPS[Math.min(3, Math.floor(S.drinks / S.limit * 4))];
   toast('🍺 ' + tier[Math.floor(Math.random() * tier.length)], 2000);
@@ -624,14 +628,14 @@ function fadeThrough(mid) {
 }
 function goOutside() {
   fadeThrough(() => {
-    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drinks: () => S.drinks,
+    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, 
       fade() { const b = $('black'); b.style.transition = 'none'; b.style.opacity = 1; requestAnimationFrame(() => { b.style.transition = 'opacity .7s ease'; b.style.opacity = 0; }); } });
     golf.camera.aspect = innerWidth / innerHeight; golf.camera.updateProjectionMatrix();
     golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter();
   });
 }
 function goInside() {
-  fadeThrough(() => { S.mode = 'world'; S.pos.set(13.3, 1.62, 3.9); S.yaw = 0; S.pitch = 0; lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); wobbleFilter(); });
+  fadeThrough(() => { golf?.leave(); S.mode = 'world'; S.pos.set(13.3, 1.62, 3.9); S.yaw = 0; S.pitch = 0; lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); wobbleFilter(); });
 }
 function golfFinish(r) {
   const total = r.card.reduce((a, v) => a + v, 0), par = r.pars.reduce((a, v) => a + v, 0), d = total - par;
@@ -721,7 +725,7 @@ const ctx = {
   keys, axes, touch: TOUCH,
   hud(html) { if (html !== lastHud) { lastHud = html; $('ghud').innerHTML = html; } },
   finish(result) { showResult(activeName, result); },
-  onGoal() { if (!S.hasKey && S.drinks >= 5) awardKey(); },
+  onGoal() { if (!S.hasKey && S.drinks >= 4) awardKey(); },      // five beers, with a minute's grace as they wear off
 };
 function startGame(name, opt = {}) {
   disposeGame();
@@ -824,7 +828,8 @@ if (TOUCH) {
     #tAct:active{filter:brightness(1.15)}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
-    .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-clubs{bottom:176px} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px;bottom:150px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
+    .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px} .g-side.left{left:12px;right:auto;top:96px;bottom:auto;min-width:0}
+    .g-acc{width:240px;bottom:150px} .g-bar.golf{bottom:186px} .g-clubs{bottom:216px} #gmap{top:8px;right:8px}
     .g-top{top:12px;max-width:96vw;flex-wrap:wrap;justify-content:center} .pill{font-size:12.5px;padding:6px 10px} .g-bar{bottom:150px;width:200px} .g-msg{font-size:22px;white-space:normal;width:86vw}
     .g-band{width:220px} #controls{white-space:normal;width:80vw}`;
   document.head.appendChild(css);
@@ -861,7 +866,7 @@ if (TOUCH) {
         const L = tu.look; tu.look = null;
         const tap = Math.hypot(t.clientX - L.x0, t.clientY - L.y0) < 12 && performance.now() - L.t0 < 320;
         if (tap && S.mode === 'world') use(t.clientX, t.clientY);
-        else if (tap && S.mode === 'outside' && golf.S.state === 'foot') golf.use();
+        else if (tap && S.mode === 'outside' && golf.S.state === 'foot') golf.use(true);
       }
     }
   };
@@ -943,9 +948,14 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight, false);
   for (const c of [camera, active?.camera, golf?.camera]) if (c) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); }
 });
-let last = performance.now();
+let last = performance.now(), blurStep = 0;
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  // the beers slowly wear off: about one per minute (not while you are mid-game or blacked out)
+  if (S.drinks > 0 && !S.paused && (S.mode === 'world' || S.mode === 'outside' || S.mode === 'panel')) {
+    S.drinks = Math.max(0, S.drinks - dt / 60);
+    const q = Math.round(S.drinks * 5); if (q !== blurStep) { blurStep = q; wobbleFilter(); }
+  }
   if (S.mode === 'game' && active) {
     if (!S.paused) active.update(dt);
     renderer.render(active.scene, active.camera);
