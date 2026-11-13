@@ -26,8 +26,9 @@ const CLUBS = [
   { id: 'Putt', name: 'Putter', carry: 0, loft: 0, short: true, putter: true, head: 'putter' },
 ];
 for (const c of CLUBS) if (!c.putter) c.v = Math.sqrt(c.carry * G / Math.sin(2 * c.loft * DEG));
-const ROLL = { green: 2.0, fairway: 4.5, tee: 4.5, rough: 10, sand: 24 };
-const BOUNCE = { green: [0.25, 0.62], fairway: [0.3, 0.62], tee: [0.3, 0.62], rough: [0.16, 0.42], sand: [0, 0.1] };
+const ROLL = { green: 2.0, fairway: 6, tee: 6, rough: 11, sand: 24 };
+const BOUNCE = { green: [0.2, 0.35], fairway: [0.22, 0.4], tee: [0.22, 0.4], rough: [0.16, 0.35], sand: [0, 0.1] };
+const CHECK = 2.5;                                   // a shot landing on the green checks up (backspin); putts roll freely
 const SLOPE = 0.8;                                   // how strongly hills pull a rolling ball
 const CURVE = 7.5;                                   // sideways pull of a full hook or slice, m/s^2 at driver speed
 const PURE = 0.1;                                    // half-width of the "straight" zone on the accuracy bar
@@ -137,7 +138,10 @@ export function createGolf(THREE, ctx) {
     for (let k = 0, t = 0; k < NZ - 1; k++) for (let j = 0; j < NX - 1; j++) { const a = k * NX + j, b = a + 1, c2 = a + NX, d = c2 + 1; idx[t++] = a; idx[t++] = c2; idx[t++] = b; idx[t++] = b; idx[t++] = c2; idx[t++] = d; }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals();
     scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map })));
-    const far = add(new THREE.PlaneGeometry(5000, 5000), L(0x2c6a2b), 80, -0.4, 240); far.rotation.x = -Math.PI / 2;
+    // Backdrop beyond the course: four strips around the terrain, never underneath it. (The terrain is exactly 0 high
+    // at its edges, so the strips meet it cleanly. A single sheet under the course would hide every valley.)
+    const R = 3000, fm = L(0x2c6a2b), strip = (x0, x1, z0, z1) => { const m = add(new THREE.PlaneGeometry(x1 - x0, z1 - z0), fm, (x0 + x1) / 2, -0.02, (z0 + z1) / 2); m.rotation.x = -Math.PI / 2; };
+    strip(-R, TX.x0, -R, R); strip(TX.x1, R, -R, R); strip(TX.x0, TX.x1, -R, TX.z0); strip(TX.x0, TX.x1, TX.z1, R);
   }
 
   /* ---------------------------------------------------------------- flags, tee markers, signs */
@@ -238,7 +242,7 @@ export function createGolf(THREE, ctx) {
     px: 0, pz: 3, yaw: Math.PI, pitch: -0.02, led: false, hole: 0, strokes: 0, card: [],
     ball: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, mode: 'rest', bounced: 0, spin: 0 }, last: [0, 0],
     aim: 0, club: 0, cT: 0, power: 0, accT: 0, swingT: 0, flT: 0, shotAim: 0, shotClub: 0, msg: '', msgT: 0, sub: '', t: 0, endT: 0, shotFrom: [0, 0],
-    prevF: 0, done: false, pen: false, prompt: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
+    prevF: 0, done: false, pen: false, prompt: null, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
   };
   const hole = () => holes[S.hole];
   const say = (m, sub = '', t = 2.6) => { S.msg = m; S.sub = sub; S.msgT = t; };
@@ -262,12 +266,12 @@ export function createGolf(THREE, ctx) {
   }
   // putts: release at 60% for perfect weight; uphill needs more, downhill less
   function putterMax() { const h = hole(), d = distToCup(), dh = HT(h.cup[0], h.cup[1]) - HT(S.ball.x, S.ball.z); return clamp(d + SLOPE * G * dh / ROLL.green, 1.5, 60) / 0.6; }
-  const needPower = c => (c.putter ? 0.6 : clamp((c.short ? distToCup() * 0.62 : distToCup() * 0.94) / c.carry, 0, 1.2));
+  const needPower = c => (c.putter ? 0.6 : clamp((c.short ? distToCup() * 0.85 : distToCup() * 0.94) / c.carry, 0, 1.2));
   // the accuracy line sweeps left-right-left; -1 is far left (hook), +1 far right (slice), 0 is dead straight
   const accPos = () => { const t = (S.accT / 0.62) % 2; return t < 1 ? -1 + 2 * t : 3 - 2 * t; };
   function launch(b, c, p, a, lie, spin = 0) {
-    if (c.putter) { const v = Math.sqrt(2 * ROLL.green * putterMax() * p); b.vx = Math.sin(a) * v; b.vz = Math.cos(a) * v; b.vy = 0; b.mode = 'roll'; b.spin = 0; }
-    else { const v = c.v * Math.sqrt(p) * lie, lo = c.loft * DEG; b.vx = Math.sin(a) * v * Math.cos(lo); b.vz = Math.cos(a) * v * Math.cos(lo); b.vy = v * Math.sin(lo); b.y += 0.02; b.mode = 'air'; b.spin = spin; }
+    if (c.putter) { const v = Math.sqrt(2 * ROLL.green * putterMax() * p); b.vx = Math.sin(a) * v; b.vz = Math.cos(a) * v; b.vy = 0; b.mode = 'roll'; b.spin = 0; b.fromAir = false; }
+    else { b.fromAir = true; const v = c.v * Math.sqrt(p) * lie, lo = c.loft * DEG; b.vx = Math.sin(a) * v * Math.cos(lo); b.vz = Math.cos(a) * v * Math.cos(lo); b.vy = v * Math.sin(lo); b.y += 0.02; b.mode = 'air'; b.spin = spin; }
     b.bounced = 0;
   }
   // one physics step; used for real shots and for the preview. Returns 'water' when the ball is lost.
@@ -284,7 +288,7 @@ export function createGolf(THREE, ctx) {
       }
     } else if (b.mode === 'roll') {
       const surf = surfaceAt(b.x, b.z); if (surf === 'water') return 'water';
-      const [gx, gz] = grad(b.x, b.z), a = ROLL[surf] || 6;
+      const [gx, gz] = grad(b.x, b.z), a = (ROLL[surf] || 6) * (b.fromAir && surf === 'green' ? CHECK : 1);
       b.vx -= gx * G * SLOPE * dt; b.vz -= gz * G * SLOPE * dt;
       const v = Math.hypot(b.vx, b.vz), nv = v - a * dt;
       if (nv <= 0.1) { b.vx = b.vz = 0; b.mode = 'rest'; }
@@ -314,7 +318,7 @@ export function createGolf(THREE, ctx) {
     if (S.done) return;
     const h = hole(); let tx = h.cup[0], tz = h.cup[1];
     if (h.pts.length === 3) { const w = h.pts[1], dw = Math.hypot(w[0] - h.cup[0], w[1] - h.cup[1]); if (distToCup() > dw + 35) { tx = w[0]; tz = w[1]; } }
-    S.aim = Math.atan2(tx - S.ball.x, tz - S.ball.z); S.club = pickClub(); S.phase = 'aim'; S.power = 0; S.state = 'address'; S.prevF = 0;
+    S.aim = Math.atan2(tx - S.ball.x, tz - S.ball.z); S.club = pickClub(); S.phase = 'aim'; S.power = 0; S.state = 'address'; S.prevF = 0; S.snap = true;
     trailN = 0; trail.geometry.setDrawRange(0, 0);
   }
   function swing(dev) {
@@ -325,7 +329,23 @@ export function createGolf(THREE, ctx) {
     // a = bearing; turning right means a smaller bearing here, so a slice (e > 0) starts and curves right
     const push = c.putter ? 5 : c.short ? 3.5 : 1.5, spin = c.putter ? 0 : e * (c.short ? 0.35 : 1);
     const b = S.ball; S.shotFrom = [b.x, b.z]; S.last = [b.x, b.z]; S.strokes++; S.shotAim = S.aim; S.shotClub = S.club;
-    launch(b, c, p, S.aim - e * push * DEG + (Math.random() - 0.5) * 2 * err * DEG, lie, spin);
+    const ang = S.aim - e * push * DEG + (Math.random() - 0.5) * 2 * err * DEG;
+    // fly a copy of the shot first to find where it comes down; the landing camera waits there
+    S.landCam = null; S.cutDone = true;
+    if (!c.putter) {
+      Object.assign(tb, b, { vx: 0, vy: 0, vz: 0 }); launch(tb, c, p, ang, lie, spin); let tAir = 0;
+      for (let i = 0; i < 900 && tb.mode === 'air'; i++) { if (stepBall(tb, 1 / 60)) break; tAir += 1 / 60; }
+      const carry = Math.hypot(tb.x - b.x, tb.z - b.z);
+      if (carry > 70 && tAir > 2) {
+        const ax = Math.sin(ang), az = Math.cos(ang), lx = Math.cos(ang), lz = -Math.sin(ang);
+        for (const [fw, sd] of [[17, 10], [17, -10], [24, 6], [24, -6], [12, 14], [12, -14], [30, 0]]) {
+          const x = tb.x + ax * fw + lx * sd, z = tb.z + az * fw + lz * sd;
+          if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1 || trees.some(t => Math.hypot(x - t.x, z - t.z) < 4.5 * t.s)) continue;
+          S.landCam = [x, HT(x, z) + 3.4, z]; S.cutT = Math.max(0.9, tAir * 0.45); S.cutDone = false; break;
+        }
+      }
+    }
+    launch(b, c, p, ang, lie, spin);
     S.state = 'flight'; S.phase = 'aim'; S.swingT = 0.32; S.flT = 0; S.endT = 0; trailN = 0;
     const big = Math.abs(e) > 0.55;
     if (e === 0) say('Pure', 'Dead straight.', 1.3);
@@ -497,8 +517,13 @@ export function createGolf(THREE, ctx) {
         else if (S.phase === 'acc') S.accT += dt;
         const c2 = CLUBS[S.club], back = c2.putter ? 4.4 : 6.2, up = c2.putter ? 2.8 : 3.2, ax = Math.sin(S.aim), az = Math.cos(S.aim), lx = Math.cos(S.aim), lz = -Math.sin(S.aim);
         const cx = b.x - ax * back - lx * 0.9, cz = b.z - az * back - lz * 0.9;
-        S.camPos.set(cx, Math.max(HT(cx, cz) + 1.5, b.y + up), cz); camera.position.lerp(S.camPos, Math.min(1, dt * 8));
-        camera.lookAt(b.x + ax * (c2.putter ? 3 : 14), b.y + (c2.putter ? 0.2 : 1.2), b.z + az * (c2.putter ? 3 : 14));
+        let cy = Math.max(HT(cx, cz) + 1.8, b.y + up);
+        for (const t of [0.35, 0.7]) cy = Math.max(cy, HT(lerp(cx, b.x, t), lerp(cz, b.z, t)) + 1.0 + (1 - t) * 1.2);   // clear any rise between the camera and the ball
+        S.camPos.set(cx, cy, cz);
+        if (S.snap) { camera.position.copy(S.camPos); S.snap = false; } else camera.position.lerp(S.camPos, Math.min(1, dt * 8));
+        // look down the line at the ground ahead, so uphill and downhill holes both stay in frame
+        const ahead = c2.putter ? clamp(distToCup() * 0.6, 1.5, 5) : 20, tx2 = b.x + ax * ahead, tz2 = b.z + az * ahead;
+        camera.lookAt(tx2, c2.putter ? HT(tx2, tz2) + 0.1 : lerp(b.y + 1.0, HT(tx2, tz2) + 1.0, 0.7), tz2);
         preview();
       } else if (S.state === 'flight') {
         S.flT += dt;
@@ -515,12 +540,10 @@ export function createGolf(THREE, ctx) {
         if (b.mode !== 'rest' && (b.x < BOUNDS.x0 || b.x > BOUNDS.x1 || b.z < BOUNDS.z0 || b.z > BOUNDS.z1)) penalty('Out of bounds');
         if (!S.pen && b.y - HT(b.x, b.z) < 0.25 && Math.hypot(b.x - h.cup[0], b.z - h.cup[1]) < 0.36 && Math.hypot(b.vx, b.vz) < 5.5) { b.x = h.cup[0]; b.z = h.cup[1]; b.y = HT(b.x, b.z); holedOut(); }
         else if (b.mode === 'rest') { S.endT -= dt; if (S.endT <= 0) { if (S.pen) { S.pen = false; standBy(); address(); } else afterShot(); } }
-        // camera: watch the launch from behind, then swing out to the side so the arc of the shot is visible
-        const far = Math.hypot(b.x - S.shotFrom[0], b.z - S.shotFrom[1]);
-        if (S.flT > 0.55 && far > 22 && b.mode !== 'rest') {
-          const ax = Math.sin(S.shotAim), az = Math.cos(S.shotAim), lx = Math.cos(S.shotAim), lz = -Math.sin(S.shotAim);
-          const cx = b.x - ax * 17 + lx * 15, cz = b.z - az * 17 + lz * 15, gh = HT(b.x, b.z);
-          S.camPos.set(cx, Math.max(HT(cx, cz) + 2.5, gh + 4 + (b.y - gh) * 0.45), cz); camera.position.lerp(S.camPos, Math.min(1, dt * 2.4));
+        // camera: stay behind the ball as it leaves, then cut once to a camera beyond the landing spot looking back,
+        // so you see the ball come down, bounce and roll. Short shots are simply watched from where you hit them.
+        if (!S.cutDone && S.landCam && S.flT > S.cutT && b.mode === 'air') {
+          S.cutDone = true; camera.position.set(S.landCam[0], S.landCam[1], S.landCam[2]); S.camLook.set(b.x, b.y + 0.3, b.z);
         }
         S.camLook.lerp(look3.set(b.x, b.y + 0.3, b.z), Math.min(1, dt * 9)); camera.lookAt(S.camLook);
       } else if (S.state === 'holed') {
