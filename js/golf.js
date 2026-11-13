@@ -1,4 +1,5 @@
-// Story St. Golf Club: the outside world. Walk, drive the cart, and play three signature holes over rolling hills.
+// Story St.: the outside world. The apartment building (No. 7), Lucky's bar, the golf club, a cart that drifts,
+// and three signature holes over rolling hills.
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -29,8 +30,12 @@ const CHECK = 2.5;                                   // a shot landing on the gr
 const SLOPE = 0.8;                                   // how strongly hills pull a rolling ball
 const CURVE = 7.5;                                   // sideways pull of a full hook or slice, m/s^2 at driver speed
 const PURE = 0.1;                                    // half-width of the "straight" zone on the accuracy bar
-const BOUNDS = { x0: -240, x1: 420, z0: -70, z1: 500 };
-const TX = { x0: -280, x1: 460, z0: -120, z1: 540 }; // terrain mesh extent
+const BOUNDS = { x0: -340, x1: 520, z0: -170, z1: 600 };
+const TX = { x0: -380, x1: 560, z0: -220, z1: 640 }; // terrain mesh extent
+const APT = { x: -38, z: -20, w: 12, d: 11 };          // the apartment building, No. 7 (front faces +z)
+const LKY = { x: -58, z: -20, w: 15, d: 11 };          // Lucky's bar, on the far side of the apartment from the club
+const BAR = { x: -58, y: -80, z: -20, hw: 8, hd: 6 };  // Lucky's interior: a sealed room far below the lawn
+const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const COL = { rough: '#2c6a2b', fair: '#63b548', fair2: '#70c254', fringe: '#7fcb58', green: '#a6e56c', tee: '#58ad49', sand: '#f1e3ae', sandRim: '#cdbb84', ash: '#8f8983', ashRim: '#5f5a55', rock: '#5b4a3c', rock2: '#6f5a48', beach: '#e3d7a6', water: '#3d8fd6', bank: '#2a5c28', path: '#d6cdb6' };
 
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -43,7 +48,7 @@ export function createGolf(THREE, ctx) {
   const SKY = 0x9fd0f2;
   const scene = new THREE.Scene(); scene.background = new THREE.Color(SKY); scene.fog = new THREE.Fog(SKY, 420, 1350);
   const camera = new THREE.PerspectiveCamera(68, 1, 0.2, 1800); camera.rotation.order = 'YXZ';
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x55733f, 1.7));
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x55733f, 1.7); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff1d0, 1.9); sun.position.set(-90, 80, 50); scene.add(sun);   // low-ish sun so the hills read
   const L = (c, o) => new THREE.MeshLambertMaterial({ color: c, ...o });
   const add = (geo, m, x, y, z, parent = scene) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); parent.add(o); return o; };
@@ -84,7 +89,7 @@ export function createGolf(THREE, ctx) {
     h *= smooth(62, 135, Math.hypot(x, z + 10));
     return h * smooth(0, 50, Math.min(x - TX.x0, TX.x1 - x, z - TX.z0, TX.z1 - z));
   }
-  const flats = [];
+  const flats = [{ x: -50, z: -18, r0: 36, r1: 54, h: 0, k: 0 }];      // level ground under the apartment and Lucky's
   function designH(x, z) {
     let h = rawH(x, z);
     for (const f of flats) { const dx = x - f.x, dz = z - f.z; if (Math.abs(dx) < f.r1 && Math.abs(dz) < f.r1) { const d = Math.hypot(dx, dz); if (d < f.r1) h = lerp(f.h + (h - f.h) * f.k, h, smooth(f.r0, f.r1, d)); } }
@@ -118,12 +123,12 @@ export function createGolf(THREE, ctx) {
   const grad = (x, z) => [(HT(x + 1, z) - HT(x - 1, z)) / 2, (HT(x, z + 1) - HT(x, z - 1)) / 2];
 
   { // the ground mesh, with the whole course painted onto one texture
-    const tw = ctx.touch ? 2048 : 3072, th = Math.round(tw * GD / GW), s = tw / GW;
+    const tw = ctx.touch ? 2048 : 4096, th = Math.round(tw * GD / GW), s = tw / GW;
     const map = canvasTex(tw, th, (c) => {
       const X = x => (x - TX.x0) * s, Z = z => (z - TX.z0) * s, circ = (x, z, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(X(x), Z(z), r * s, 0, 6.3); c.fill(); };
       c.fillStyle = COL.rough; c.fillRect(0, 0, tw, th);
       const r2 = mulberry(7);
-      for (let i = 0; i < 2600; i++) circ(TX.x0 + r2() * GW, TX.z0 + r2() * GD, 4 + r2() * 12, r2() < 0.5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,200,.035)');
+      for (let i = 0; i < 3800; i++) circ(TX.x0 + r2() * GW, TX.z0 + r2() * GD, 4 + r2() * 12, r2() < 0.5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,200,.035)');
       c.lineCap = c.lineJoin = 'round';
       const path = (h, w, col) => { c.strokeStyle = col; c.lineWidth = w * s; c.beginPath(); h.fair.forEach(([x, z], i) => (i ? c.lineTo(X(x), Z(z)) : c.moveTo(X(x), Z(z)))); c.stroke(); };
       for (const h of holes) path(h, 32.5, 'rgba(255,255,255,.22)');       // a pale edge so fairways stand out from the rough
@@ -144,6 +149,8 @@ export function createGolf(THREE, ctx) {
       for (const b of bunkers) { circ(b.x, b.z, b.r + 0.6, b.ash ? COL.ashRim : COL.sandRim); circ(b.x, b.z, b.r - 0.2, b.ash ? COL.ash : COL.sand); }
       { const wb = bunkers.find(b => b.r > 15); if (wb) { const r3 = mulberry(3); for (let i = 0; i < 60; i++) { const a = r3() * 6.28, d = r3() * (wb.r - 2); circ(wb.x + Math.cos(a) * d, wb.z + Math.sin(a) * d, 0.5 + r3() * 1.4, r3() < 0.5 ? 'rgba(160,140,90,.35)' : 'rgba(255,255,255,.25)'); } } }   // ripples in the waste bunker
       c.fillStyle = COL.path; c.fillRect(X(-3), Z(-7), 6 * s, 26 * s); circ(6, 18, 9, COL.path);
+      c.fillRect(X(-68), Z(-11.6), 66 * s, 3.2 * s);                                               // the sidewalk along Story St.
+      for (const B of [APT, LKY]) c.fillRect(X(B.x - 1.6), Z(B.z + B.d / 2), 3.2 * s, 3.4 * s);
     });
     map.anisotropy = 8;
     const pos = new Float32Array(NX * NZ * 3), uv = new Float32Array(NX * NZ * 2), idx = new Uint32Array((NX - 1) * (NZ - 1) * 6);
@@ -189,9 +196,9 @@ export function createGolf(THREE, ctx) {
 
   /* ---------------------------------------------------------------- trees */
   const trees = [];
-  for (let i = 0; i < 1400 && trees.length < 300; i++) {
+  for (let i = 0; i < 2600 && trees.length < 430; i++) {
     const x = lerp(BOUNDS.x0 + 10, BOUNDS.x1 - 10, rng()), z = lerp(BOUNDS.z0 + 10, BOUNDS.z1 - 10, rng());
-    if (Math.abs(x) < 60 && z < 40) continue;
+    if (x > -98 && x < 60 && z > -48 && z < 40) continue;                  // keep the street and the first tee walk clear
     if (ponds.some(p => Math.hypot(x - p.x, z - p.z) < p.r + 10)) continue;
     if (bunkers.some(b => Math.hypot(x - b.x, z - b.z) < b.r + 4)) continue;
     if (holes.some(h => (h.teeUp && Math.hypot(x - h.tee[0], z - h.tee[1]) < 30) || ((h.plateau || h.bowl) && Math.hypot(x - h.green[0], z - h.green[1]) < h.gr + 36))) continue;
@@ -218,11 +225,178 @@ export function createGolf(THREE, ctx) {
   const signT = canvasTex(1024, 160, (c, W, Hh) => { c.fillStyle = '#1f4e2f'; c.fillRect(0, 0, W, Hh); c.strokeStyle = '#f2d98a'; c.lineWidth = 8; c.strokeRect(10, 10, W - 20, Hh - 20); c.fillStyle = '#f2d98a'; c.font = 'bold 84px Georgia, serif'; c.textAlign = 'center'; c.fillText('STORY ST. GOLF CLUB', W / 2, 108); });
   add(new THREE.PlaneGeometry(13, 2), new THREE.MeshBasicMaterial({ map: signT }), 0, 10.3, 13.52, CH);
   for (const s of [-1, 1]) { bx(CH, 12, 1.1, 1.6, 0x2c6a36, s * 16, 0.55, 9.6); add(new THREE.CylinderGeometry(0.06, 0.06, 9, 8), L(0xdddddd), s * 21, 4.5, 16, CH); }
-  // the red apartment door, standing in its frame on the lawn
-  const RD = { x: -7, z: 6 };
-  const rd = new THREE.Group(); rd.position.set(RD.x, 0, RD.z); rd.rotation.y = 0.5; scene.add(rd);
-  bx(rd, 1.0, 2.1, 0.08, 0x7a2e2a, 0, 1.05, 0); bx(rd, 0.1, 2.25, 0.16, 0xf5f1e8, -0.55, 1.12, 0); bx(rd, 0.1, 2.25, 0.16, 0xf5f1e8, 0.55, 1.12, 0); bx(rd, 1.2, 0.1, 0.16, 0xf5f1e8, 0, 2.2, 0);
-  add(new THREE.SphereGeometry(0.05, 10, 8), L(0xd9b34a), 0.38, 1.02, 0.08, rd);
+  /* ---------------------------------------------------------------- Story St.: the apartment building and Lucky's */
+  const glow = c => new THREE.MeshBasicMaterial({ color: c });
+  const cyl = (parent, rt, rb, h, c, x, y, z, seg = 12) => add(new THREE.CylinderGeometry(rt, rb, h, seg), typeof c === 'number' ? L(c) : c, x, y, z, parent);
+  const sph = (parent, r, c, x, y, z) => add(new THREE.SphereGeometry(r, 14, 10), typeof c === 'number' ? L(c) : c, x, y, z, parent);
+  const brickT = (base, mortar, rx, ry) => {
+    const t = canvasTex(256, 256, (c, W, H) => { c.fillStyle = mortar; c.fillRect(0, 0, W, H); const r = mulberry(11); for (let y = 0; y < 16; y++) for (let x = -1; x < 8; x++) { const sh = 0.86 + r() * 0.26; c.fillStyle = `rgb(${base.map(v => Math.round(v * sh)).join(',')})`; c.fillRect(x * 32 + (y % 2) * 16 + 1, y * 16 + 1, 30, 14); } });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); return t;
+  };
+  const clover = (c, x, y, r) => {                       // a four-leaf clover, drawn in neon
+    c.save(); c.translate(x, y); c.rotate(Math.PI / 4); c.fillStyle = '#5dff9a'; c.strokeStyle = '#5dff9a'; c.shadowColor = '#39ff88'; c.shadowBlur = r * 0.5;
+    for (let i = 0; i < 4; i++) { c.rotate(Math.PI / 2); c.beginPath(); c.arc(r * 0.3, -r * 0.3, r * 0.34, 0, 6.3); c.arc(r * 0.3, r * 0.3, r * 0.34, 0, 6.3); c.fill(); }
+    c.rotate(-Math.PI / 4); c.lineWidth = r * 0.13; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, r * 0.2); c.quadraticCurveTo(r * 0.1, r * 0.9, r * 0.45, r * 1.25); c.stroke(); c.restore();
+  };
+  const luckyT = canvasTex(1024, 192, (c, W, H) => {
+    c.fillStyle = '#0d0f0d'; c.fillRect(0, 0, W, H); clover(c, 205, H / 2 - 10, 62);
+    c.shadowColor = '#39ff88'; c.shadowBlur = 28; c.fillStyle = '#c9ffe0'; c.font = 'italic bold 138px Georgia, "Times New Roman", serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let i = 0; i < 2; i++) c.fillText('Lucky’s', W / 2 + 80, H / 2 + 6);
+  });
+  const numT = canvasTex(128, 128, (c, W, H) => { c.fillStyle = '#17181b'; c.beginPath(); c.roundRect(4, 4, W - 8, H - 8, 16); c.fill(); c.strokeStyle = '#d9b34a'; c.lineWidth = 5; c.stroke(); c.fillStyle = '#e8c45a'; c.font = 'bold 96px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('7', W / 2, H / 2 + 6); });
+  { // No. 7: four storeys of brick. The red front door takes you back up to the living room.
+    const A = new THREE.Group(); A.position.set(APT.x, 0, APT.z); scene.add(A);
+    const W = APT.w, D = APT.d, FH = 3.1, H = FH * 4, fz = D / 2;
+    bx(A, W, H, D, new THREE.MeshLambertMaterial({ map: brickT([168, 84, 66], '#cdbfae', 5, 8) }), 0, H / 2, 0);
+    bx(A, W + 0.3, 0.8, D + 0.3, 0xb9b2a4, 0, 0.4, 0);
+    for (let f = 1; f < 4; f++) bx(A, W + 0.16, 0.14, D + 0.16, 0xe6dfd2, 0, f * FH + 0.25, 0);
+    bx(A, W + 0.7, 0.45, D + 0.7, 0xf0ebe0, 0, H + 0.22, 0); bx(A, W + 0.2, 0.5, D + 0.2, 0x7d3f33, 0, H + 0.7, 0);
+    const glass = L(0x2b4a6b), lit = glow(0xf6d98a), trim = L(0xf5f1e8);
+    const win = (x, y, z, ry, on) => {
+      const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; A.add(g);
+      bx(g, 1.5, 1.9, 0.08, on ? lit : glass, 0, 0, 0); bx(g, 1.8, 0.14, 0.26, trim, 0, -1.02, 0.05); bx(g, 1.8, 0.2, 0.16, trim, 0, 1.05, 0.03);
+      bx(g, 0.07, 1.9, 0.1, trim, 0, 0, 0.01); bx(g, 1.5, 0.07, 0.1, trim, 0, 0, 0.01); for (const k of [-1, 1]) bx(g, 0.1, 1.9, 0.12, trim, k * 0.8, 0, 0.01);
+    };
+    const wr = mulberry(77);
+    for (let f = 0; f < 4; f++) {
+      const y = f * FH + 1.95;
+      for (const x of [-3.9, 0, 3.9]) { if (f || x) win(x, y, fz + 0.03, 0, wr() < 0.35); win(x, y, -fz - 0.03, Math.PI, wr() < 0.3); }
+      for (const z of [-2.6, 2.6]) { win(W / 2 + 0.03, y, z, Math.PI / 2, wr() < 0.3); win(-W / 2 - 0.03, y, z, -Math.PI / 2, wr() < 0.3); }
+    }
+    bx(A, 3.4, 0.16, 1.7, 0xb9b2a4, 0, 0.08, fz + 0.85);                                             // stoop
+    bx(A, 1.7, 2.75, 0.14, trim, 0, 1.45, fz + 0.03); bx(A, 1.2, 2.2, 0.1, 0x9b2226, 0, 1.26, fz + 0.09);   // casing, red door
+    bx(A, 0.84, 0.72, 0.03, 0x7f1b1f, 0, 0.72, fz + 0.14); bx(A, 0.84, 0.62, 0.03, 0x7f1b1f, 0, 1.5, fz + 0.14);
+    bx(A, 1.2, 0.36, 0.08, lit, 0, 2.6, fz + 0.09);                                                  // transom
+    add(new THREE.PlaneGeometry(0.34, 0.34), new THREE.MeshBasicMaterial({ map: numT }), 0, 2.08, fz + 0.16, A);          // the 7 on the door
+    add(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: numT }), 1.45, 1.85, fz + 0.02, A);       // and a bigger one beside it
+    sph(A, 0.055, 0xd9b34a, 0.45, 1.2, fz + 0.17);
+    bx(A, 2.6, 0.12, 1.4, 0x1f4e2f, 0, 3.02, fz + 0.7); for (const k of [-1, 1]) { bx(A, 0.06, 0.06, 1.3, 0x222222, k * 1.2, 2.92, fz + 0.65); bx(A, 0.14, 0.3, 0.14, 0x222222, k * 1.12, 2.45, fz + 0.1); sph(A, 0.09, glow(0xffe2a0), k * 1.12, 2.3, fz + 0.12); }
+    for (const k of [-1, 1]) { bx(A, 0.7, 0.55, 0.7, 0x4a3a2c, k * 2.3, 0.28, fz + 0.5); sph(A, 0.45, 0x2c7a3a, k * 2.3, 0.85, fz + 0.5); }
+    bx(A, 2.6, 2.1, 2.6, 0x7d3f33, -3, H + 1.95, -1.5); cyl(A, 1.15, 1.15, 1.9, 0x6b4a2f, 3, H + 2.6, -2, 14); cyl(A, 0.05, 1.3, 0.8, 0x4a3323, 3, H + 3.95, -2, 14);
+    for (const [x, z] of [[2.2, -2.8], [3.8, -2.8], [2.2, -1.2], [3.8, -1.2]]) bx(A, 0.12, 0.8, 0.12, 0x333333, x, H + 1.3, z);
+  }
+  { // Lucky's, from the street
+    const K = new THREE.Group(); K.position.set(LKY.x, 0, LKY.z); scene.add(K);
+    const W = LKY.w, D = LKY.d, H = 4.6, fz = D / 2, green = 0x14432a, warm = glow(0xe0a850);
+    bx(K, W, H, D, new THREE.MeshLambertMaterial({ map: brickT([92, 70, 60], '#2b2420', 6, 3) }), 0, H / 2, 0);
+    bx(K, W + 0.3, 0.5, D + 0.3, 0x15130f, 0, H + 0.25, 0); bx(K, W + 0.12, 0.9, 0.24, green, 0, 3.45, fz + 0.04); bx(K, W + 0.12, 0.6, 0.24, green, 0, 0.3, fz + 0.04);
+    for (const k of [-1, 1]) {
+      bx(K, 4.2, 2.1, 0.1, warm, k * 4.6, 1.8, fz + 0.02);
+      for (const y of [0.7, 2.9]) bx(K, 4.5, 0.14, 0.2, green, k * 4.6, y, fz + 0.06); for (const x of [-2.18, 0, 2.18]) bx(K, 0.12, 2.2, 0.2, green, k * 4.6 + x, 1.8, fz + 0.06);
+      cyl(K, 0.42, 0.38, 0.9, 0x6b4a2f, k * 1.7, 0.45, fz + 0.75, 14); for (const y of [0.2, 0.7]) cyl(K, 0.43, 0.43, 0.05, 0x2a2a2a, k * 1.7, y, fz + 0.75, 14);
+    }
+    add(new THREE.PlaneGeometry(1.5, 0.56), new THREE.MeshBasicMaterial({ map: canvasTex(256, 96, (c, W2, H2) => { c.fillStyle = '#1a0d0d'; c.fillRect(0, 0, W2, H2); c.shadowColor = '#ff4a4a'; c.shadowBlur = 16; c.fillStyle = '#ffd0d0'; c.font = 'bold 64px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; for (let i = 0; i < 2; i++) c.fillText('OPEN', W2 / 2, H2 / 2 + 4); }) }), 3.5, 2.35, fz + 0.09, K);
+    bx(K, 1.5, 2.6, 0.14, green, 0, 1.3, fz + 0.03); bx(K, 1.15, 2.3, 0.1, 0x5b3a22, 0, 1.18, fz + 0.08); bx(K, 0.05, 0.5, 0.06, 0xd9b34a, 0.42, 1.15, fz + 0.16);
+    cyl(K, 0.26, 0.26, 0.04, warm, 0, 1.7, fz + 0.13, 20).rotation.x = Math.PI / 2;
+    bx(K, 3, 0.12, 1.5, 0xb9b2a4, 0, 0.06, fz + 0.75);
+    bx(K, 9.6, 2.0, 0.3, 0x0d0f0d, 0, H + 1.5, fz - 0.4); for (const k of [-1, 1]) bx(K, 0.14, 1, 0.14, 0x222222, k * 4, H + 0.7, fz - 0.4);
+    add(new THREE.PlaneGeometry(9.3, 1.74), new THREE.MeshBasicMaterial({ map: luckyT }), 0, H + 1.5, fz - 0.24, K);
+    const sb = new THREE.Group(); sb.position.set(3.4, 0, fz + 2.3); sb.rotation.y = -0.35; K.add(sb);                       // sandwich board
+    const sbT = canvasTex(192, 256, (c, W2, H2) => { c.fillStyle = '#1b1d1a'; c.fillRect(0, 0, W2, H2); c.fillStyle = '#f4efe6'; c.textAlign = 'center'; c.font = 'bold 34px Georgia, serif'; c.fillText('COLD BEER', W2 / 2, 70); c.font = '26px Georgia, serif'; c.fillText('pool · darts', W2 / 2, 124); c.fillText('good luck', W2 / 2, 164); clover(c, W2 / 2, 208, 22); });
+    for (const k of [-1, 1]) { const b2 = bx(sb, 0.7, 1.0, 0.04, 0x5b3a22, 0, 0.5, k * 0.16); b2.rotation.x = -k * 0.3; const pl = add(new THREE.PlaneGeometry(0.6, 0.84), new THREE.MeshBasicMaterial({ map: sbT }), 0, 0.5, k * 0.19, sb); pl.rotation.x = -k * 0.3; if (k < 0) pl.rotation.y = Math.PI, pl.rotation.x = k * 0.3; }
+  }
+
+  /* ---------------------------------------------------------------- inside Lucky's (a sealed room under the lawn) */
+  const barG = new THREE.Group(); barG.position.set(BAR.x, BAR.y, BAR.z); scene.add(barG);
+  const tender = new THREE.Group(), tArm = new THREE.Group(), tHead = new THREE.Group();
+  { const HW = BAR.hw, HD = BAR.hd, CE = 3.8, wood = 0x3b2414, dark = 0x2e1d12, green = 0x14432a, wall = 0x27463a, brass = 0xc9a24a;
+    const floorT = canvasTex(512, 512, (c, W, H) => { const r = mulberry(5); for (let y = 0; y < 8; y++) for (let x = -1; x < 3; x++) { const v = 70 + r() * 34; c.fillStyle = `rgb(${v + 38 | 0},${v | 0},${v * 0.55 | 0})`; c.fillRect(x * 256 + (y % 2) * 128, y * 64, 254, 62); } c.fillStyle = 'rgba(0,0,0,.35)'; for (let y = 0; y < 8; y++) c.fillRect(0, y * 64 + 62, W, 2); });
+    floorT.wrapS = floorT.wrapT = THREE.RepeatWrapping; floorT.repeat.set(4, 3);
+    add(new THREE.PlaneGeometry(HW * 2, HD * 2), new THREE.MeshLambertMaterial({ map: floorT }), 0, 0, 0, barG).rotation.x = -Math.PI / 2;
+    bx(barG, HW * 2 + 0.4, 0.2, HD * 2 + 0.4, 0x191613, 0, CE + 0.1, 0); for (const x of [-5.2, 0, 5.2]) bx(barG, 0.3, 0.3, HD * 2, dark, x, CE - 0.15, 0);
+    for (const k of [-1, 1]) {
+      bx(barG, HW * 2 + 0.4, CE, 0.2, wall, 0, CE / 2, k * (HD + 0.1)); bx(barG, 0.2, CE, HD * 2 + 0.4, wall, k * (HW + 0.1), CE / 2, 0);
+      bx(barG, HW * 2, 1.1, 0.08, 0x4a2f1c, 0, 0.55, k * (HD - 0.04)); bx(barG, 0.08, 1.1, HD * 2, 0x4a2f1c, k * (HW - 0.04), 0.55, 0);
+      bx(barG, HW * 2, 0.07, 0.14, dark, 0, 1.13, k * (HD - 0.07)); bx(barG, 0.14, 0.07, HD * 2, dark, k * (HW - 0.07), 1.13, 0);
+    }
+    // the bar itself
+    bx(barG, 10.4, 1.08, 0.7, wood, -0.8, 0.54, -2.35); bx(barG, 10.8, 0.09, 1.0, 0x7a4a26, -0.8, 1.125, -2.3);
+    for (let i = 0; i < 8; i++) bx(barG, 1.05, 0.7, 0.03, 0x4a2f1c, -5.35 + i * 1.3, 0.58, -1.99);
+    cyl(barG, 0.035, 0.035, 10.4, brass, -0.8, 0.2, -1.86, 8).rotation.z = Math.PI / 2;
+    bx(barG, 0.7, 1.08, 3.0, wood, 4.05, 0.54, -4.2); bx(barG, 0.95, 0.09, 3.2, 0x7a4a26, 4.05, 1.125, -4.2);
+    for (let i = 0; i < 6; i++) { const x = -5.1 + i * 1.72; cyl(barG, 0.21, 0.21, 0.08, 0x7a1f1f, x, 0.8, -1.3, 16); cyl(barG, 0.03, 0.03, 0.76, 0x888888, x, 0.4, -1.3, 8); cyl(barG, 0.2, 0.22, 0.04, 0x555555, x, 0.02, -1.3, 16); cyl(barG, 0.15, 0.15, 0.02, 0x888888, x, 0.3, -1.3, 14); }
+    cyl(barG, 0.05, 0.06, 0.34, brass, 1.6, 1.33, -2.5, 10); bx(barG, 0.62, 0.12, 0.14, brass, 1.6, 1.52, -2.5);                 // taps
+    [0xd64545, 0x2f7d4a, 0xf2b441].forEach((c, i) => { bx(barG, 0.05, 0.24, 0.05, c, 1.38 + i * 0.22, 1.69, -2.5); bx(barG, 0.03, 0.1, 0.03, brass, 1.38 + i * 0.22, 1.47, -2.42); });
+    const beer = new THREE.MeshLambertMaterial({ color: 0xe0a02a, transparent: true, opacity: 0.85 });
+    for (const [x, z] of [[-4.6, -2.15], [-2.9, -2.3], [0.4, -2.1], [3.0, -2.2]]) { cyl(barG, 0.045, 0.038, 0.15, beer, x, 1.245, z, 10); cyl(barG, 0.046, 0.046, 0.025, 0xfffbea, x, 1.33, z, 10); }
+    bx(barG, 0.16, 0.1, 0.12, 0xf4f1ea, -1.9, 1.22, -2.1); cyl(barG, 0.07, 0.06, 0.16, new THREE.MeshLambertMaterial({ color: 0xcfe3e0, transparent: true, opacity: 0.5 }), 2.6, 1.25, -2.55, 10);
+    // back bar: cabinet, mirror, shelves of bottles, the neon
+    bx(barG, 9.6, 1.0, 0.55, dark, -0.8, 0.5, -5.6); bx(barG, 9.8, 0.06, 0.6, 0x7a4a26, -0.8, 1.03, -5.6);
+    bx(barG, 9.3, 1.7, 0.05, 0x3f514d, -0.8, 2.0, -5.94); bx(barG, 9.6, 0.1, 0.1, brass, -0.8, 2.88, -5.92); bx(barG, 9.6, 0.1, 0.1, brass, -0.8, 1.12, -5.92);
+    for (const y of [1.62, 2.24]) bx(barG, 9.4, 0.05, 0.3, 0x7a4a26, -0.8, y, -5.76);
+    { const bg = new THREE.CylinderGeometry(0.045, 0.045, 1, 8), ng = new THREE.CylinderGeometry(0.017, 0.03, 0.11, 8), cols = [0x2f7d4a, 0x9a5b1e, 0xcfe3e0, 0x2b5fa8, 0x9b2226, 0x3a2416, 0xd9b34a].map(c => L(c)), r = mulberry(21);
+      for (const y of [1.06, 1.645, 2.265]) for (let i = 0; i < 24; i++) { if (r() < 0.14) continue; const h = 0.24 + r() * 0.12, m = cols[(r() * cols.length) | 0], x = -5.3 + i * 0.39 + (r() - 0.5) * 0.08; const b2 = add(bg, m, x, y + h / 2, -5.72, barG); b2.scale.y = h; add(ng, m, x, y + h + 0.05, -5.72, barG); } }
+    add(new THREE.PlaneGeometry(5.0, 0.94), new THREE.MeshBasicMaterial({ map: luckyT }), -0.8, 3.36, -5.98, barG);
+    bx(barG, 1.9, 1.1, 0.08, 0x111111, 5.9, 2.75, -5.9);                                                                    // the game is on
+    add(new THREE.PlaneGeometry(1.78, 0.98), new THREE.MeshBasicMaterial({ map: canvasTex(356, 196, (c, W, H) => { c.fillStyle = '#2f8a4a'; c.fillRect(0, 0, W, H); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 3; c.strokeRect(20, 46, W - 40, H - 66); c.beginPath(); c.moveTo(W / 2, 46); c.lineTo(W / 2, H - 20); c.stroke(); c.beginPath(); c.arc(W / 2, 113, 26, 0, 6.3); c.stroke(); c.fillStyle = '#10151f'; c.fillRect(0, 0, W, 34); c.fillStyle = '#fff'; c.font = 'bold 20px Arial, sans-serif'; c.textBaseline = 'middle'; c.fillText('HARVARD 12', 12, 18); c.fillText('YALE 7', 164, 18); c.fillStyle = '#f2b441'; c.fillText('4th 2:41', 256, 18); }) }), 5.9, 2.75, -5.85, barG);
+    // pendants over the bar
+    for (const x of [-4.8, -2.3, 0.2, 2.7]) { cyl(barG, 0.012, 0.012, 1.0, 0x222222, x, CE - 0.5, -2.3, 6); cyl(barG, 0.07, 0.24, 0.26, green, x, 2.72, -2.3, 14); sph(barG, 0.075, glow(0xffdfa8), x, 2.62, -2.3); }
+    const pl = (c, i, x, y, z, d = 13) => { const l = new THREE.PointLight(c, i, d, 1.6); l.position.set(x, y, z); barG.add(l); };
+    pl(0xffc98a, 17, -3.4, 2.6, -1.6); pl(0xffc98a, 17, 2.0, 2.6, -1.6); pl(0xffd9a8, 16, -1, 3.0, 3.2); pl(0x49ff9a, 8, -0.8, 3.0, -4.9, 8);
+    // pool table
+    { const P = new THREE.Group(); P.position.set(-4.3, 0, 2.6); barG.add(P);
+      bx(P, 2.7, 0.28, 1.5, wood, 0, 0.78, 0); bx(P, 2.36, 0.03, 1.16, 0x1f7a45, 0, 0.925, 0);
+      for (const k of [-1, 1]) { bx(P, 2.7, 0.07, 0.17, 0x4a2f1c, 0, 0.955, k * 0.665); bx(P, 0.17, 0.07, 1.5, 0x4a2f1c, k * 1.265, 0.955, 0); for (const j of [-1, 1]) bx(P, 0.16, 0.66, 0.16, dark, k * 1.15, 0.33, j * 0.55); }
+      [[0.5, 0.1, 0xf2b441], [0.62, 0.02, 0x2b5fa8], [0.62, 0.18, 0xd64545], [0.74, -0.06, 0x7a2e8a], [0.74, 0.1, 0x111111], [0.74, 0.26, 0xe07a1f], [-0.7, 0.05, 0xffffff], [-0.1, -0.35, 0x2f7d4a]].forEach(([x, z, c]) => sph(P, 0.045, c, x, 0.985, z));
+      cyl(P, 0.012, 0.018, 1.7, 0xd8b98a, -0.2, 1.0, 0.42, 6).rotation.set(0, 0, Math.PI / 2 - 0.02);
+      cyl(P, 0.012, 0.012, 1.1, 0x222222, 0, CE - 0.55, 0, 6); bx(P, 1.5, 0.2, 0.6, green, 0, 2.6, 0); bx(P, 1.3, 0.03, 0.44, glow(0xffe9b8), 0, 2.49, 0); }
+    // high-top tables
+    for (const [x, z] of [[3.4, 3.4], [6.0, 1.0]]) { cyl(barG, 0.46, 0.46, 0.05, 0x7a4a26, x, 1.06, z, 20); cyl(barG, 0.045, 0.045, 1.04, 0x555555, x, 0.52, z, 8); cyl(barG, 0.3, 0.32, 0.04, 0x555555, x, 0.02, z, 16);
+      for (const k of [-1, 1]) { cyl(barG, 0.19, 0.19, 0.07, 0x7a1f1f, x + k * 0.8, 0.76, z + 0.15 * k, 14); cyl(barG, 0.028, 0.028, 0.74, 0x888888, x + k * 0.8, 0.38, z + 0.15 * k, 8); cyl(barG, 0.18, 0.2, 0.03, 0x555555, x + k * 0.8, 0.015, z + 0.15 * k, 14); }
+      cyl(barG, 0.045, 0.038, 0.15, beer, x + 0.15, 1.16, z - 0.1, 10); }
+    // jukebox, dartboard, neon clover, door and daylight windows
+    bx(barG, 0.95, 1.25, 0.6, 0x6b1f1f, 7.1, 0.625, -4.9); cyl(barG, 0.475, 0.475, 0.6, 0x6b1f1f, 7.1, 1.25, -4.9, 20).rotation.x = Math.PI / 2;
+    bx(barG, 0.7, 0.5, 0.04, glow(0xffb347), 7.1, 1.1, -4.58); for (let i = 0; i < 3; i++) bx(barG, 0.7, 0.05, 0.05, glow([0x4ae0ff, 0xff5fa2, 0x7dff6a][i]), 7.1, 0.3 + i * 0.16, -4.58);
+    const dart = add(new THREE.CircleGeometry(0.3, 28), new THREE.MeshBasicMaterial({ map: canvasTex(128, 128, (c, W) => { const cols = ['#111', '#e9e2c9', '#111', '#b8312a', '#2f7d4a', '#b8312a']; [62, 52, 34, 22, 10, 4].forEach((r, i) => { c.fillStyle = cols[i]; c.beginPath(); c.arc(W / 2, W / 2, r, 0, 6.3); c.fill(); }); c.strokeStyle = '#999'; c.lineWidth = 1; for (let i = 0; i < 10; i++) { const a = i * Math.PI / 10; c.beginPath(); c.moveTo(W / 2 - Math.cos(a) * 52, W / 2 - Math.sin(a) * 52); c.lineTo(W / 2 + Math.cos(a) * 52, W / 2 + Math.sin(a) * 52); c.stroke(); } }) }), HW - 0.09, 1.75, 2.6, barG); dart.rotation.y = -Math.PI / 2;
+    bx(barG, 0.06, 0.8, 0.8, dark, HW - 0.05, 1.75, 2.6);
+    const cl = add(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ map: canvasTex(256, 256, (c, W) => { c.fillStyle = '#0f1512'; c.fillRect(0, 0, W, W); clover(c, W / 2, W / 2 - 16, 78); }) }), -HW + 0.09, 2.35, 0.2, barG); cl.rotation.y = Math.PI / 2;
+    bx(barG, 0.06, 1.62, 1.62, dark, -HW + 0.05, 2.35, 0.2);
+    bx(barG, 1.5, 2.6, 0.12, green, 0, 1.3, HD - 0.05); bx(barG, 1.15, 2.3, 0.1, 0x5b3a22, 0, 1.17, HD - 0.1); bx(barG, 0.05, 0.5, 0.06, brass, -0.42, 1.15, HD - 0.17);
+    const ex = add(new THREE.PlaneGeometry(0.62, 0.24), new THREE.MeshBasicMaterial({ map: canvasTex(128, 48, (c, W, H) => { c.fillStyle = '#b8201a'; c.fillRect(0, 0, W, H); c.fillStyle = '#fff'; c.font = 'bold 34px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('EXIT', W / 2, H / 2 + 2); }) }), 0, 2.85, HD - 0.12, barG); ex.rotation.y = Math.PI;
+    for (const k of [-1, 1]) { bx(barG, 4.2, 2.1, 0.06, glow(0xbfe0f7), k * 4.6, 1.95, HD - 0.03); for (const y of [0.86, 3.04]) bx(barG, 4.5, 0.14, 0.14, green, k * 4.6, y, HD - 0.08); for (const x of [-2.18, 0, 2.18]) bx(barG, 0.12, 2.2, 0.14, green, k * 4.6 + x, 1.95, HD - 0.08); }
+    // the bartender
+    const skin = L(0xf1c7a3), topM = L(0x16181c), jean = L(0x2f4a78), hair = L(0xf4d875);
+    tender.position.set(-1.2, 0, -3.2); tender.scale.setScalar(0.97); barG.add(tender);
+    for (const k of [-1, 1]) bx(tender, 0.15, 0.86, 0.17, jean, k * 0.1, 0.43, 0);
+    cyl(tender, 0.17, 0.2, 0.2, jean, 0, 0.94, 0, 14); cyl(tender, 0.19, 0.145, 0.42, topM, 0, 1.24, 0, 14); cyl(tender, 0.15, 0.19, 0.07, skin, 0, 1.475, 0, 14);
+    for (const k of [-1, 1]) { const b2 = sph(tender, 0.1, topM, k * 0.088, 1.335, 0.11); b2.scale.set(1, 0.95, 0.95); sph(tender, 0.065, skin, k * 0.215, 1.45, 0); bx(tender, 0.035, 0.1, 0.03, topM, k * 0.13, 1.5, 0.02); }
+    cyl(tender, 0.045, 0.05, 0.12, skin, 0, 1.56, 0, 10);
+    tHead.position.set(0, 1.7, 0); tender.add(tHead);
+    sph(tHead, 0.115, skin, 0, 0, 0).scale.set(0.95, 1.08, 1);
+    for (const k of [-1, 1]) { sph(tHead, 0.017, 0x2a5a8a, k * 0.042, 0.015, 0.104); bx(tHead, 0.045, 0.008, 0.01, 0x8a6a2a, k * 0.042, 0.05, 0.106); }
+    bx(tHead, 0.055, 0.016, 0.02, 0xc4455a, 0, -0.052, 0.1);
+    const cap = add(new THREE.SphereGeometry(0.128, 18, 12, 0, 6.2832, 0, Math.PI * 0.56), hair, 0, 0.012, -0.012, tHead); cap.rotation.x = -0.42;
+    bx(tHead, 0.25, 0.52, 0.09, hair, 0, -0.2, -0.085); for (const k of [-1, 1]) { const lk = cyl(tHead, 0.04, 0.028, 0.46, hair, k * 0.118, -0.2, 0.015, 8); lk.rotation.z = k * 0.06; }
+    tArm.position.set(-0.215, 1.45, 0); tArm.rotation.x = -1.1; tender.add(tArm);                                   // wiping the bar down
+    cyl(tArm, 0.038, 0.032, 0.54, skin, 0, -0.27, 0, 8); sph(tArm, 0.045, skin, 0, -0.56, 0); bx(tArm, 0.18, 0.03, 0.14, 0xf4f1ea, 0, -0.6, 0);
+    const a2 = cyl(tender, 0.038, 0.032, 0.48, skin, 0.27, 1.22, 0, 8); a2.rotation.z = 0.2; sph(tender, 0.045, skin, 0.32, 0.98, 0.02);
+  }
+  const barBlocked = (x, z) => Math.abs(x) > BAR.hw - 0.4 || Math.abs(z) > BAR.hd - 0.4 || (x < 4.75 && z < -0.9) || z < -3.5
+    || (Math.abs(x + 4.3) < 1.75 && Math.abs(z - 2.6) < 1.15) || Math.hypot(x - 3.4, z - 3.4) < 0.8 || Math.hypot(x - 6.0, z - 1.0) < 0.8;
+  const LINES = ['“First one’s on the house.”', '“Cold one, coming up.”', '“How did the Volcano treat you?”', '“Same again?”', '“Nobody drives the cart after this one.”', '“They say it brings luck on the Island hole.”', '“You live at number 7, right?”'];
+  function setBar(on) { hemi.intensity = on ? 0.42 : 1.7; sun.intensity = on ? 0 : 1.9; }
+  function enterBar() { ctx.fade?.(); setBar(true); S.state = 'bar'; S.bx = 0; S.bz = BAR.hd - 1.3; S.yaw = 0; S.pitch = 0; S.lineT = 0; mapEl.classList.add('hidden'); }
+  function leaveBar() { ctx.fade?.(); setBar(false); S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; S.yaw = Math.PI; S.pitch = 0; mapEl.classList.remove('hidden'); }
+  function orderBeer() { S.line = LINES[(Math.random() * LINES.length) | 0]; S.lineT = 3.4; ctx.drink?.(); }
+  function updateBar(dt, f, s) {
+    if (f || s) {
+      const sp = (ctx.keys.ShiftLeft || ctx.keys.ShiftRight ? 5 : 3.4) * Math.min(1, Math.hypot(f, s)), n = Math.hypot(f, s) || 1, sn = Math.sin(S.yaw), cs = Math.cos(S.yaw);
+      const nx = S.bx + (-sn * f + cs * s) / n * sp * dt, nz = S.bz + (-cs * f - sn * s) / n * sp * dt;
+      if (!barBlocked(nx, S.bz)) S.bx = nx; if (!barBlocked(S.bx, nz)) S.bz = nz;
+    }
+    camera.position.set(BAR.x + S.bx, BAR.y + 1.68, BAR.z + S.bz); camera.rotation.set(S.pitch, S.yaw, 0);
+    if (Math.hypot(S.bx, S.bz - BAR.hd) < 1.9) S.prompt = { k: 'out', t: 'Back out to Story St.' };
+    else if (Math.hypot(S.bx + 1.2, S.bz + 0.9) < 2.6) S.prompt = { k: 'tender', t: 'Order a beer' };
+    // she wipes the bar and keeps an eye on you
+    const want = clamp(Math.atan2(S.bx - tender.position.x, S.bz - tender.position.z), -0.7, 0.7);
+    tender.rotation.y += (want * 0.5 - tender.rotation.y) * Math.min(1, dt * 3); tHead.rotation.y += (want * 0.5 - tHead.rotation.y) * Math.min(1, dt * 4);
+    tArm.rotation.z = Math.sin(S.t * 2.6) * 0.3; tender.position.y = Math.sin(S.t * 1.7) * 0.006;
+    S.lineT -= dt;
+    let html = `<div class="g-top"><div class="pill">Lucky’s</div></div>`;
+    if (S.lineT > 0) html += `<div class="g-prompt" style="top:24%">Bartender: ${S.line}</div>`;
+    if (S.prompt) html += `<div class="g-prompt">${ctx.touch ? `USE — ${S.prompt.t}` : `<kbd>E</kbd> or click — ${S.prompt.t}`}</div>`;
+    ctx.hud(html);
+  }
 
   /* ---------------------------------------------------------------- golf cart */
   const cartG = new THREE.Group(); cartG.rotation.order = 'YXZ'; scene.add(cartG);
@@ -233,7 +407,7 @@ export function createGolf(THREE, ctx) {
   const wheel = add(new THREE.TorusGeometry(0.16, 0.025, 6, 14), L(0x222222), -0.35, 1.2, -0.55, cartG); wheel.rotation.x = -1.0;
   add(new THREE.CylinderGeometry(0.2, 0.17, 0.95, 10), L(0x9b1c2c), 0.3, 1.45, 1.2, cartG).rotation.x = -0.2;       // golf bag
   for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 5), L(0xc9ccd2), 0.22 + i * 0.08, 2.05, 1.12, cartG);
-  const cart = { x: 9, z: 17, h: Math.PI * 0.9, v: 0 };
+  const cart = { x: 9, z: 17, h: Math.PI * 0.9, v: 0, d: Math.PI * 0.9, slip: 0 };      // h: where it points, d: where it is actually going
 
   /* ---------------------------------------------------------------- ball, markers, shot preview, trail */
   const ballM = add(new THREE.SphereGeometry(0.12, 14, 10), L(0xffffff, { emissive: 0x666666 }), 0, 0.12, 0);
@@ -242,6 +416,21 @@ export function createGolf(THREE, ctx) {
   const ring = add(new THREE.RingGeometry(1.5, 2.0, 28), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide }), 0, 0.1, 0); ring.rotation.x = -Math.PI / 2; ring.renderOrder = 6;
   const dots = (n, size, color, opacity) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setDrawRange(0, 0); const p = new THREE.Points(g, new THREE.PointsMaterial({ color, size: size * Math.min(window.devicePixelRatio || 1, 2), sizeAttenuation: false, transparent: true, opacity, depthWrite: false })); p.frustumCulled = false; scene.add(p); return p; };
   const arc = dots(140, 5, 0xffffff, 0.95), trail = dots(700, 4, 0xfff3a0, 0.9); let trailN = 0;
+  const smoke = dots(90, 15, 0xeeeae2, 0.42), smokeP = [];
+  smoke.material.map = canvasTex(64, 64, (c) => { const g = c.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); }); smoke.material.needsUpdate = true;      // soft round puffs
+  const flames = [-1, 1].map(k => { const m = add(new THREE.ConeGeometry(0.17, 1.2, 8), new THREE.MeshBasicMaterial({ color: 0xff9a2e, transparent: true, opacity: 0.9 }), k * 0.45, 0.55, 1.9, cartG); m.rotation.x = Math.PI / 2; m.visible = false; return m; });
+  function cartFx(dt) {                                  // tyre smoke while drifting, flames and dust on turbo
+    const on = S.state === 'cart';
+    for (const m of flames) { m.visible = on && S.turbo; if (m.visible) m.scale.set(1, 0.6 + Math.random() * 0.8, 1); }
+    if (on && (S.drift || S.turbo) && Math.abs(cart.v) > 6) for (const k of [-1, 1]) {
+      if (smokeP.length >= 90) smokeP.shift();
+      const rx = cart.x - Math.sin(cart.h) * 1.0 + Math.cos(cart.h) * 0.75 * k, rz = cart.z - Math.cos(cart.h) * 1.0 - Math.sin(cart.h) * 0.75 * k;
+      smokeP.push({ x: rx + (Math.random() - 0.5) * 0.4, y: HT(rx, rz) + 0.25, z: rz + (Math.random() - 0.5) * 0.4, t: 0.8 });
+    }
+    const p = smoke.geometry.attributes.position.array; let n = 0;
+    for (let i = smokeP.length - 1; i >= 0; i--) { const q = smokeP[i]; q.t -= dt; q.y += dt * 1.3; if (q.t <= 0) { smokeP.splice(i, 1); continue; } p[n * 3] = q.x; p[n * 3 + 1] = q.y; p[n * 3 + 2] = q.z; n++; }
+    smoke.geometry.setDrawRange(0, n); smoke.geometry.attributes.position.needsUpdate = true;
+  }
 
   /* ---------------------------------------------------------------- the golfer and his clubs */
   const golfer = new THREE.Group(); scene.add(golfer);
@@ -269,7 +458,7 @@ export function createGolf(THREE, ctx) {
     px: 0, pz: 3, yaw: Math.PI, pitch: -0.02, led: false, hole: 0, strokes: 0, card: [],
     ball: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, mode: 'rest', bounced: 0, spin: 0 }, last: [0, 0],
     aim: 0, club: 0, cT: 0, power: 0, accT: 0, swingT: 0, flT: 0, shotAim: 0, shotClub: 0, msg: '', msgT: 0, sub: '', t: 0, endT: 0, shotFrom: [0, 0],
-    prevF: 0, done: false, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
+    prevF: 0, bx: 0, bz: 4.6, turbo: false, drift: false, line: '', lineT: 0, done: false, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
   };
   const hole = () => holes[S.hole];
   const say = (m, sub = '', t = 2.6) => { S.msg = m; S.sub = sub; S.msgT = t; };
@@ -279,6 +468,7 @@ export function createGolf(THREE, ctx) {
     if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) return true;
     if (Math.abs(x) < 24 + r && z > -29 - r && z < -11.5 + r) return true;            // clubhouse
     if (Math.abs(x) < 9.5 + r && z > -12 && z < -6.6 + r) return true;                 // portico
+    for (const B of [APT, LKY]) if (Math.abs(x - B.x) < B.w / 2 + r && z > B.z - B.d / 2 - r && z < B.z + B.d / 2 + r) return true;
     for (const p of ponds) if (inWater(p, x, z, -0.12)) return true;                 // water blocks you; the island itself is walkable
     for (const t of trees) if (Math.abs(x - t.x) < 2 && Math.abs(z - t.z) < 2 && Math.hypot(x - t.x, z - t.z) < 0.5 * t.s + r) return true;
     return false;
@@ -411,6 +601,7 @@ export function createGolf(THREE, ctx) {
   }
   // fromClick: a mouse click only acts on things you are standing next to; skipping ahead needs E
   function use(fromClick) {
+    if (S.state === 'bar') { if (S.prompt?.k === 'out') leaveBar(); else if (S.prompt?.k === 'tender') orderBeer(); return; }
     if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; return; }
     if (S.state === 'landed') { if (!S.done) goNext(); return; }
     if (S.state === 'cart') { exitCart(); if (!S.done && Math.hypot(S.ball.x - S.px, S.ball.z - S.pz) < 9) { standBy(); address(); } return; }
@@ -427,6 +618,7 @@ export function createGolf(THREE, ctx) {
     else if (k === 'next') { if (!fromClick) goNext(); }
     else if (k === 'club') ctx.toast?.('Members only. The course is all yours, though.');
     else if (k === 'door') ctx.goInside?.();
+    else if (k === 'bar') enterBar();
   }
   function reset() { S.card = []; S.done = false; teeUp(0); const h = holes[0]; cart.h = Math.atan2(h.dir0[0], h.dir0[1]); cart.x = h.tee[0] - h.dir0[1] * 5 - h.dir0[0] * 7; cart.z = h.tee[1] + h.dir0[0] * 5 - h.dir0[1] * 7; cart.v = 0; S.state = 'cart'; S.led = true; say('Hole 1', 'A fresh round.', 2.5); }
 
@@ -484,19 +676,19 @@ export function createGolf(THREE, ctx) {
   const look3 = new THREE.Vector3();
 
   const api = {
-    scene, camera, S,
+    scene, camera, S, cart,
     get label() { return S.state === 'address' ? (S.phase === 'acc' ? 'STOP' : 'SWING') : S.state === 'cart' ? 'EXIT' : S.state === 'landed' ? 'NEXT' : 'USE'; },
     get canBack() { return S.state === 'address'; },
     back() { if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; } },
     use, reset,
     // test hook: play a shot with a given power (0..1) and accuracy (-1..1, 0 = straight)
     hit(p, dev = 0) { if (S.state === 'address') { S.power = clamp(p, 0, 1); swing(dev); } },
-    enter() { S.state = 'foot'; S.px = RD.x + 2.5; S.pz = RD.z + 20; S.yaw = -0.12; S.pitch = 0.1; mapEl.classList.remove('hidden');   // a few steps out, looking back at the clubhouse
-      say('Story St. Golf Club', S.led ? '' : 'The cart out front will take you to the first tee.', 3.5); },
-    leave() { mapEl.classList.add('hidden'); },
+    enter() { setBar(false); S.state = 'foot'; S.px = APT.x; S.pz = APT.z + APT.d / 2 + 4.8; S.yaw = -2.2; S.pitch = 0; mapEl.classList.remove('hidden');   // out of your front door, looking down the street to the club
+      say('Story St.', S.led ? '' : 'The cart outside the golf club will take you to the first tee.', 3.5); },
+    leave() { setBar(false); if (S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; } mapEl.classList.add('hidden'); },
     look(dx, dy) {
       if (S.state === 'address') { if (S.phase !== 'acc') S.aim -= dx * 0.0011; return; }
-      if (S.state === 'foot') { S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.3, 1.3); }
+      if (S.state === 'foot' || S.state === 'bar') { S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.3, 1.3); }
     },
     down(src) {
       if (S.state === 'address') {
@@ -512,6 +704,8 @@ export function createGolf(THREE, ctx) {
       S.t += dt; S.msgT -= dt; S.swingT -= dt;
       const { f, s } = ctx.axes(), b = S.ball, h = hole();
       S.prompt = null;
+      if (camera.fov !== 68 && S.state !== 'cart') { camera.fov = 68; camera.updateProjectionMatrix(); }
+      if (S.state === 'bar') { updateBar(dt, f, s); return; }
       if (S.state === 'landed' && (Math.abs(f) > 0.3 || Math.abs(s) > 0.3)) S.state = 'foot';        // walk off instead of skipping ahead
       if (S.state === 'foot') {
         if (f || s) {
@@ -523,7 +717,8 @@ export function createGolf(THREE, ctx) {
         const near = (x, z, r) => Math.hypot(x - S.px, z - S.pz) < r, farBall = !S.done && !near(b.x, b.z, 3.6);
         if (near(cart.x, cart.z, 3.6)) S.prompt = { k: 'cart', t: S.led ? 'Drive the golf cart' : 'Take the cart to the first tee' };
         else if (!S.done && near(b.x, b.z, 3.6)) S.prompt = { k: 'ball', t: 'Play your shot' };
-        else if (near(RD.x, RD.z, 2.6)) S.prompt = { k: 'door', t: 'Back to the apartment' };
+        else if (near(APT.x, APT.z + APT.d / 2 + 0.9, 2.5)) S.prompt = { k: 'door', t: 'No. 7 — go up to your apartment' };
+        else if (near(LKY.x, LKY.z + LKY.d / 2 + 0.9, 2.5)) S.prompt = { k: 'bar', t: 'Go into Lucky’s' };
         else if (near(0, -8, 4)) S.prompt = { k: 'club', t: 'Clubhouse' };
         else if (farBall && S.led) S.prompt = { k: 'next', t: S.strokes === 0 ? `Go to the hole ${S.hole + 1} tee` : 'Go to your ball' };
       } else if (S.state === 'landed') {
@@ -531,15 +726,23 @@ export function createGolf(THREE, ctx) {
         camera.lookAt(S.camLook);
       } else if (S.state === 'cart') {
         const [gx, gz] = grad(cart.x, cart.z), fx = Math.sin(cart.h), fz = Math.cos(cart.h), climb = gx * fx + gz * fz;
-        const target = f > 0 ? 15 * f : f < 0 ? 5 * f : 0, acc = f ? 9 : 7;
+        // Space = turbo (it pulls on its own), Shift = drift: the back steps out and the cart slides the way it was going
+        const turbo = !!ctx.keys.Space, drift = !!(ctx.keys.ShiftLeft || ctx.keys.ShiftRight) && Math.abs(cart.v) > 5;
+        const top = turbo ? 40 : 24, target = turbo ? top : f > 0 ? top * f : f < 0 ? 8 * f : 0, acc = turbo ? 24 : f ? 13 : 7;
         cart.v += clamp(target - cart.v, -acc * dt, acc * dt) - climb * 6 * dt;
-        if (!f && Math.abs(cart.v) < 0.4) cart.v = 0;                              // parking brake on hills
+        if (!f && !turbo && Math.abs(cart.v) < 0.4) cart.v = 0;                    // parking brake on hills
         if (surfaceAt(cart.x, cart.z) === 'sand') cart.v *= 1 - 2.5 * dt;
-        cart.h -= s * dt * 1.5 * clamp(cart.v / 6, -1, 1);
-        const nx = cart.x + Math.sin(cart.h) * cart.v * dt, nz = cart.z + Math.cos(cart.h) * cart.v * dt;
-        if (!blockedAt(nx, nz, 1.2)) { cart.x = nx; cart.z = nz; } else cart.v *= -0.2;
-        const cx = cart.x - Math.sin(cart.h) * 8, cz = cart.z - Math.cos(cart.h) * 8, cy = HT(cart.x, cart.z);
-        S.camPos.set(cx, Math.max(HT(cx, cz) + 2, cy + 4.2), cz); camera.position.lerp(S.camPos, Math.min(1, dt * 5)); camera.lookAt(cart.x + Math.sin(cart.h) * 4, cy + 1.4, cart.z + Math.cos(cart.h) * 4);
+        cart.h -= s * dt * (drift ? 2.3 : 1.6) / (1 + Math.max(0, Math.abs(cart.v) - 16) / 34) * clamp(cart.v / 6, -1, 1);
+        if (Math.abs(cart.v) < 1.5) cart.d = cart.h; else cart.d += wrap(cart.h - cart.d) * Math.min(1, (drift ? 1.3 : 10) * dt);
+        cart.slip = wrap(cart.h - cart.d);
+        if (Math.abs(cart.slip) > 0.85) { cart.slip = Math.sign(cart.slip) * 0.85; cart.d = cart.h - cart.slip; }
+        if (drift) cart.v *= 1 - Math.abs(cart.slip) * 0.3 * dt;
+        const nx = cart.x + Math.sin(cart.d) * cart.v * dt, nz = cart.z + Math.cos(cart.d) * cart.v * dt;
+        if (!blockedAt(nx, nz, 1.2)) { cart.x = nx; cart.z = nz; } else { cart.v *= -0.2; cart.d = cart.h; }
+        S.turbo = turbo && cart.v > 8; S.drift = drift && Math.abs(cart.slip) > 0.12;
+        const ca = cart.d + cart.slip * 0.35, cx = cart.x - Math.sin(ca) * 8, cz = cart.z - Math.cos(ca) * 8, cy = HT(cart.x, cart.z);
+        S.camPos.set(cx, Math.max(HT(cx, cz) + 2, cy + 4.2), cz); camera.position.lerp(S.camPos, Math.min(1, dt * 7)); camera.lookAt(cart.x + Math.sin(ca) * 4, cy + 1.4, cart.z + Math.cos(ca) * 4);
+        const fov = 68 + clamp((Math.abs(cart.v) - 22) / 18, 0, 1) * 16; if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
         S.px = cart.x; S.pz = cart.z;
         S.prompt = { k: 'exit', t: !S.done && Math.hypot(b.x - cart.x, b.z - cart.z) < 9 ? 'Hop out and play your shot' : 'Hop out' };
       } else if (S.state === 'address') {
@@ -592,7 +795,8 @@ export function createGolf(THREE, ctx) {
       if (S.state === 'address' || S.state === 'foot' || S.state === 'cart') S.camLook.set(b.x, b.y + 0.3, b.z);
       // scene objects
       { const [gx, gz] = grad(cart.x, cart.z), fx = Math.sin(cart.h), fz = Math.cos(cart.h);
-        cartG.position.set(cart.x, HT(cart.x, cart.z), cart.z); cartG.rotation.set(Math.atan(gx * fx + gz * fz), cart.h + Math.PI, -Math.atan(gx * fz - gz * fx)); }
+        cartG.position.set(cart.x, HT(cart.x, cart.z), cart.z); cartG.rotation.set(Math.atan(gx * fx + gz * fz), cart.h + Math.PI, -Math.atan(gx * fz - gz * fx) + cart.slip * 0.22); }
+      cartFx(dt);
       wheel.rotation.z = -s * 0.8 * (S.state === 'cart' ? 1 : 0);
       ballM.position.set(b.x, b.y + 0.12, b.z);
       const showBeam = !S.done && (S.state === 'foot' || S.state === 'cart' || S.state === 'landed'); beam.visible = showBeam; beam.position.set(b.x, b.y + 17, b.z);
@@ -631,7 +835,7 @@ export function createGolf(THREE, ctx) {
         const heading = S.state === 'cart' ? cart.h : S.yaw + Math.PI, hd = Math.hypot(b.x - S.px, b.z - S.pz);
         if (!S.done && S.state !== 'landed') html += `<div class="g-wind">${S.strokes === 0 ? `Hole ${S.hole + 1} tee` : 'Your ball'} <b>${arrow(b.x, b.z, heading)} ${hd.toFixed(0)} m</b></div>`;
         if (S.prompt) html += `<div class="g-prompt">${ctx.touch ? `${api.label} — ${S.prompt.t}` : S.prompt.k === 'next' ? `<kbd>E</kbd> — ${S.prompt.t}` : `<kbd>E</kbd> or click — ${S.prompt.t}`}</div>`;
-        if (S.state === 'cart') html += `<div class="g-tip">${ctx.touch ? 'Stick to drive' : 'W/S or ↑/↓ to drive · A/D or ←/→ to steer'}</div>`;
+        if (S.state === 'cart') html += `<div class="g-tip">${ctx.touch ? 'Stick to drive' : 'W/S to drive · A/D to steer · hold Shift to drift · Space for turbo'}</div><div class="g-wind" style="${ctx.touch ? 'top:96px;left:12px' : 'top:auto;bottom:74px;left:50%;transform:translateX(-50%)'}"><b>${Math.round(Math.abs(cart.v) * 3.6)}</b> km/h${S.turbo ? ' · <b>TURBO</b>' : ''}${S.drift ? ' · <b>DRIFT</b>' : ''}</div>`;
         else if (S.state === 'landed') html += `<div class="g-tip">${ctx.touch ? 'Or move the stick to walk' : 'Or use WASD to walk, and take the cart if you like'}</div>`;
       }
       ctx.hud(html);

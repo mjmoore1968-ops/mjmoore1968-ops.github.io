@@ -684,16 +684,17 @@ function updateWake(dt) {
 const SIPS = [['Cheers.', 'One more.', 'Refreshing.'], ['Feeling good.', 'Okay, okay.', 'That one went down easy.'],
   ['Is the room moving?', 'Who tilted the floor?', 'This is fine.'], ['Bad idea.', 'Maybe sit down.', 'The walls are breathing.']];
 function drink() {
-  if (S.mode !== 'world') return;
+  if (S.mode !== 'world' && S.mode !== 'outside') return;      // the bar cart at home, or a beer at Lucky's
   S.drinks += 1; wobbleFilter();
   if (S.drinks >= S.limit) { toast('Goodnight.', 2000); blackout(); return; }
   const tier = SIPS[Math.min(3, Math.floor(S.drinks / S.limit * 4))];
   toast('🍺 ' + tier[Math.floor(Math.random() * tier.length)], 2000);
 }
+let blackFrom = 'world';
 function blackout() {
-  S.mode = 'blackout'; $('prompt').classList.add('hidden');
+  blackFrom = S.mode; S.mode = 'blackout'; $('prompt').classList.add('hidden');
   const b = $('black'); b.style.transition = 'opacity 1.8s ease'; b.style.opacity = 1;
-  setTimeout(() => { canvas.style.filter = ''; wake(); }, 2700);
+  setTimeout(() => { canvas.style.filter = ''; if (blackFrom === 'outside') { golf?.leave(); lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); blackFrom = 'world'; } wake(); }, 2700);
 }
 
 /* ------------------------------------------------------------------ panels */
@@ -759,7 +760,7 @@ function fadeThrough(mid) {
 }
 function goOutside() {
   fadeThrough(() => {
-    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, 
+    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drink,
       fade() { const b = $('black'); b.style.transition = 'none'; b.style.opacity = 1; requestAnimationFrame(() => { b.style.transition = 'opacity .7s ease'; b.style.opacity = 0; }); } });
     golf.camera.aspect = innerWidth / innerHeight; golf.camera.updateProjectionMatrix();
     golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter();
@@ -945,7 +946,7 @@ function touchUI() {
 }
 if (TOUCH) {
   const el = document.createElement('div'); el.id = 'touch'; el.className = 'hidden';
-  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tExit" class="hidden">✕ Exit</button>`;
+  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
   document.body.appendChild(el);
   const css = document.createElement('style');
   css.textContent = `
@@ -957,6 +958,8 @@ if (TOUCH) {
     #tAct{position:absolute;right:max(26px,env(safe-area-inset-right));bottom:max(40px,env(safe-area-inset-bottom));width:96px;height:96px;border-radius:50%;pointer-events:auto;
       background:rgba(242,180,65,.9);color:#1a1303;border:0;font-weight:800;font-size:13.5px;letter-spacing:.03em;touch-action:none}
     #tAct:active{filter:brightness(1.15)}
+    .tCart{position:absolute;right:max(132px,calc(env(safe-area-inset-right) + 106px));width:72px;height:72px;border-radius:50%;pointer-events:auto;background:rgba(16,21,31,.82);color:#fff;border:2px solid rgba(255,255,255,.4);font-weight:800;font-size:11.5px;letter-spacing:.03em;touch-action:none}
+    .tCart.on{background:rgba(242,180,65,.92);color:#1a1303} #tTurbo{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tDrift{bottom:max(34px,env(safe-area-inset-bottom))}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
     .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px} .g-side.left{left:12px;right:auto;top:96px;bottom:auto;min-width:0}
@@ -997,7 +1000,7 @@ if (TOUCH) {
         const L = tu.look; tu.look = null;
         const tap = Math.hypot(t.clientX - L.x0, t.clientY - L.y0) < 12 && performance.now() - L.t0 < 320;
         if (tap && S.mode === 'world') use(t.clientX, t.clientY);
-        else if (tap && S.mode === 'outside' && golf.S.state === 'foot') golf.use(true);
+        else if (tap && S.mode === 'outside' && (golf.S.state === 'foot' || golf.S.state === 'bar')) golf.use(true);
       }
     }
   };
@@ -1006,6 +1009,10 @@ if (TOUCH) {
   act.addEventListener('touchstart', e => { e.preventDefault(); if (S.mode === 'game') active?.down?.('btn'); else if (S.mode === 'outside') golf.down('btn'); else if (S.mode === 'world') use(); }, { passive: false });
   act.addEventListener('touchend', e => { e.preventDefault(); if (S.mode === 'game') active?.up?.('btn'); else if (S.mode === 'outside') golf.up(); }, { passive: false });
   $('tExit').addEventListener('click', () => { if (S.mode === 'outside') golf.back(); else exitGame(true); });
+  for (const [id, code] of [['tTurbo', 'Space'], ['tDrift', 'ShiftLeft']]) {            // cart buttons: hold to boost or slide
+    const b = $(id), set = v => e => { e.preventDefault(); keys[code] = v; b.classList.toggle('on', v); };
+    b.addEventListener('touchstart', set(true), { passive: false }); b.addEventListener('touchend', set(false), { passive: false }); b.addEventListener('touchcancel', set(false), { passive: false });
+  }
 }
 
 /* ------------------------------------------------------------------ interaction */
@@ -1079,7 +1086,7 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight, false);
   for (const c of [camera, active?.camera, golf?.camera]) if (c) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); }
 });
-let last = performance.now(), blurStep = 0;
+let last = performance.now(), blurStep = 0, cartBtns = false;
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05); last = now;
   // the beers slowly wear off: about one per minute (not while you are mid-game or blacked out)
@@ -1090,7 +1097,7 @@ function frame(now) {
   if (S.mode === 'game' && active) {
     if (!S.paused) active.update(dt);
     renderer.render(active.scene, active.camera);
-  } else if (golf && (S.mode === 'outside' || (S.mode === 'panel' && panelFrom === 'outside'))) {
+  } else if (golf && (S.mode === 'outside' || (S.mode === 'panel' && panelFrom === 'outside') || (S.mode === 'blackout' && blackFrom === 'outside'))) {
     if (S.mode === 'outside' && !S.paused) golf.update(dt);
     renderer.render(golf.scene, golf.camera);
   } else { updateWorld(dt); renderer.render(scene, camera); }
@@ -1101,6 +1108,8 @@ function frame(now) {
   if (TOUCH) {
     const lb = S.mode === 'game' ? (active?.label || 'GO') : S.mode === 'outside' ? golf.label : 'USE'; if (lb !== lastLabel) { lastLabel = lb; $('tAct').textContent = lb; }
     $('tExit').classList.toggle('hidden', !(S.mode === 'game' || (S.mode === 'outside' && golf.canBack)));
+    const inCart = S.mode === 'outside' && golf.S.state === 'cart' && !S.paused;
+    if (inCart !== cartBtns) { cartBtns = inCart; for (const id of ['tTurbo', 'tDrift']) { $(id).classList.toggle('hidden', !inCart); $(id).classList.remove('on'); } if (!inCart) keys.Space = keys.ShiftLeft = false; }
   }
   requestAnimationFrame(frame);
 }
