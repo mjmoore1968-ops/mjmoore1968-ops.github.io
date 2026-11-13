@@ -490,7 +490,7 @@ function lock() {
   try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* the "click to look" hint covers this */ }
 }
 function unlock() { if (locked()) { leaving = true; document.exitPointerLock(); } }
-function setPaused(v) { S.paused = v; $('pause').classList.toggle('hidden', !v); }
+function setPaused(v) { S.paused = v; $('pause').classList.toggle('hidden', !v); $('homeBtn').classList.toggle('hidden', S.mode !== 'outside'); }
 document.addEventListener('pointerlockchange', () => {
   if (locked()) { setPaused(false); return; }
   if (leaving) { leaving = false; return; }
@@ -498,6 +498,7 @@ document.addEventListener('pointerlockchange', () => {
   else if (S.mode === 'world' || S.mode === 'outside') setPaused(true);
 });
 $('pause').addEventListener('click', () => { setPaused(false); lock(); });
+$('homeBtn').addEventListener('click', e => { e.stopPropagation(); setPaused(false); goInside(); });      // Esc on the golf course offers a way home
 
 /* ------------------------------------------------------------------ HUD helpers */
 let toastTimer;
@@ -771,6 +772,7 @@ addEventListener('keydown', e => {
     else if (S.paused) { if (e.code === 'KeyE') { setPaused(false); lock(); } }
     else if (S.mode === 'world' && e.code === 'KeyE') use();
     else if (S.mode === 'outside' && e.code === 'KeyE') golf.use();
+    else if (S.mode === 'outside' && e.code === 'Escape') setPaused(true);
   } else if (e.code === 'Space' && S.mode === 'game') active?.down?.('key');
   else if (e.code === 'Space' && S.mode === 'outside' && !S.paused) golf.down('key');
 });
@@ -815,7 +817,7 @@ if (TOUCH) {
     #tAct:active{filter:brightness(1.15)}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
-    .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-tip{display:none} .g-bar.golf{width:240px;bottom:150px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
+    .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-clubs{bottom:176px} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px;bottom:150px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px}
     .g-top{top:12px;max-width:96vw;flex-wrap:wrap;justify-content:center} .pill{font-size:12.5px;padding:6px 10px} .g-bar{bottom:150px;width:200px} .g-msg{font-size:22px;white-space:normal;width:86vw}
     .g-band{width:220px} #controls{white-space:normal;width:80vw}`;
   document.head.appendChild(css);

@@ -107,6 +107,9 @@
     padding:10px 14px;font:13px/1.7 ui-monospace,Menlo,monospace;min-width:190px}
   .g-wind{position:absolute;left:16px;top:44px;background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:13px ui-monospace,Menlo,monospace}
   .g-wind b{color:var(--amber)}
+  .g-clubs{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);display:flex;gap:5px}
+  .g-clubs span{background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:4px 9px;font:600 12.5px ui-monospace,Menlo,monospace;color:var(--dim)}
+  .g-clubs span.on{background:var(--amber);color:#1a1303;border-color:var(--amber)}
   .g-prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);padding:8px 14px;border-radius:999px;font-size:14px;white-space:nowrap}
   .g-tip{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:rgba(255,255,255,.85);font-size:12.5px;text-shadow:0 1px 3px #000;white-space:nowrap}
   .g-bar.golf{width:340px;height:16px;bottom:48px;overflow:visible} .g-bar.golf i{border-radius:8px}
@@ -156,7 +159,7 @@
 <div id="plane">✈️</div>
 <div id="key" aria-hidden="true"><svg viewBox="0 0 120 60"><g fill="none" stroke="#f2b441" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="30" r="15"/><path d="M39 30h68M88 30v16M104 30v12"/></g><circle cx="24" cy="30" r="5" fill="#0d1118"/></svg></div>
 
-<div id="pause" class="overlay hidden"><div><p>Paused</p><small>Click to keep going</small></div></div>
+<div id="pause" class="overlay hidden"><div><p>Paused</p><small>Click anywhere to keep going</small><button class="btn ghost small hidden" id="homeBtn" style="margin-top:18px">Back to home</button></div></div>
 
 <div id="panel" class="overlay hidden">
   <div class="box">
