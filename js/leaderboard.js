@@ -29,6 +29,15 @@ export function cleanName(raw) {
   return n;
 }
 
+// arcade-style initials: exactly three letters or digits, upper case. Returns '' if unusable.
+const BLOCK3 = ['ASS','FAG','FUK','FUC','FCK','KKK','SEX','CUM','TIT','NIG','NGR','JEW','GAY','DIK','DIC','COK','CNT','PUS','VAG','ANL','HOE','FAP','JIZ','WTF','SUK','POO','PEE','BUM','NUT','XXX'];
+export function cleanInitials(raw) {
+  const n = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+  if (n.length !== 3) return '';
+  const flat = n.replace(/[0134578]/g, c => ({ 0: 'O', 1: 'I', 3: 'E', 4: 'A', 5: 'S', 7: 'T', 8: 'B' }[c]));
+  return BLOCK3.includes(n) || BLOCK3.includes(flat) ? '' : n;
+}
+
 const lsKey = g => `mmjr.scores.${g}`;
 function localAll(game) {
   try { return JSON.parse(localStorage.getItem(lsKey(game)) || '[]'); } catch { return []; }

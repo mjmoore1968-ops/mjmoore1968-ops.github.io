@@ -635,7 +635,6 @@ function goInside() {
 }
 function golfFinish(r) {
   const total = r.card.reduce((a, v) => a + v, 0), par = r.pars.reduce((a, v) => a + v, 0), d = total - par;
-  let saved = ''; try { saved = localStorage.getItem('mmjr.name') || ''; } catch { /* ignore */ }
   const cell = (v, p) => `<td class="${v < p ? 'under' : v > p ? 'over' : ''}">${v}</td>`;
   openPanel(`
     <h2>Story St. Golf Club</h2>
@@ -643,19 +642,14 @@ function golfFinish(r) {
     <table class="card"><tr><th>Hole</th>${r.pars.map((_, i) => `<td>${i + 1}</td>`).join('')}<td>Out</td></tr>
       <tr><th>Par</th>${r.pars.map(p => `<td>${p}</td>`).join('')}<td>${par}</td></tr>
       <tr><th>You</th>${r.card.map((v, i) => cell(v, r.pars[i])).join('')}<td>${total}</td></tr></table>
-    <form id="scoreForm" class="row" style="justify-content:flex-start;align-items:flex-end">
-      <div style="flex:1;min-width:160px"><label for="pName">Name for the leaderboard</label>
-      <input id="pName" maxlength="12" value="${esc(saved)}" placeholder="Your name" autocomplete="off"></div>
-      <button class="btn" type="submit">Post score</button>
-    </form>
+    ${scoreFormHtml()}
     <ul class="board" id="resBoard" style="margin-top:16px;font-size:14px"></ul>
     <div class="row" style="justify-content:flex-start;margin-top:16px"><button class="btn small" id="again">Play another round</button></div>`);
   fillBoard('golf', $('resBoard'), 8);
   $('again').addEventListener('click', () => { closePanel(); golf.reset(); });
   $('scoreForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const nm = LB.cleanName($('pName').value);
-    try { localStorage.setItem('mmjr.name', nm); } catch { /* ignore */ }
+    const nm = readInitials(); if (!nm) return;
     $('scoreForm').innerHTML = '<p style="margin:0">Posting…</p>';
     const ok = await LB.submit('golf', nm, total);
     $('scoreForm').innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
@@ -675,6 +669,24 @@ const BLURB = {
   rocket: 'Launch, drop stage 2 at the right moment, then land the booster on what fuel is left. Watch the wind.',
   parkour: TOUCH ? 'Run three live charts. Dodge crashes, spikes and bears.' : 'Run three live charts. Space to jump. Dodge crashes, spikes and bears.',
 };
+// Leaderboard entries are three initials. You type them once; after that every score posts under the same ones.
+function savedInitials() { try { return LB.cleanInitials(localStorage.getItem('mmjr.initials')); } catch { return ''; } }
+function scoreFormHtml() {
+  const ini = savedInitials();
+  return ini
+    ? `<form id="scoreForm" class="row" style="justify-content:flex-start;align-items:center"><p style="margin:0">Posting as <b class="ini">${ini}</b></p><button class="btn" type="submit">Post score</button></form>`
+    : `<form id="scoreForm" class="row" style="justify-content:flex-start;align-items:flex-end">
+      <div><label for="pName">Your 3 initials (used for every score from now on)</label>
+      <input id="pName" class="ini" maxlength="3" minlength="3" required pattern="[A-Za-z0-9]{3}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <button class="btn" type="submit">Post score</button></form>`;
+}
+function readInitials() {
+  const had = savedInitials(); if (had) return had;
+  const inp = $('pName'), ini = LB.cleanInitials(inp?.value);
+  if (!ini) { if (inp) { inp.value = ''; inp.placeholder = 'Try 3 others'; inp.focus(); } return ''; }
+  try { localStorage.setItem('mmjr.initials', ini); } catch { /* ignore */ }
+  return ini;
+}
 async function fillBoard(game, el, n = 5) {
   if (!el) return;
   const rows = await LB.top(game, n);
@@ -730,17 +742,12 @@ function showResult(name, r) {
   if (S.mode !== 'game') return;
   S.mode = 'world'; showWorldHud(true); wobbleFilter();
   const g = LB.GAMES[name], opt = activeOpt;
-  let saved = ''; try { saved = localStorage.getItem('mmjr.name') || ''; } catch { /* ignore */ }
   openPanel(`
     <h2>${g.title}</h2>
     <div class="big">${esc(r.headline)}</div>
     <p>${esc(r.text || '')}</p>
     ${r.submit === false ? '' : `
-    <form id="scoreForm" class="row" style="justify-content:flex-start;align-items:flex-end">
-      <div style="flex:1;min-width:160px"><label for="pName">Name for the leaderboard</label>
-      <input id="pName" maxlength="12" value="${esc(saved)}" placeholder="Your name" autocomplete="off"></div>
-      <button class="btn" type="submit">Post score</button>
-    </form>`}
+    ${scoreFormHtml()}`}
     <ul class="board" id="resBoard" style="margin-top:16px;font-size:14px"></ul>
     <div class="row" style="justify-content:flex-start;margin-top:16px">
       <button class="btn small" id="again">Play again</button>
@@ -751,8 +758,7 @@ function showResult(name, r) {
   $('menu').addEventListener('click', () => { disposeGame(); openGames(); });
   $('scoreForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    const nm = LB.cleanName($('pName').value);
-    try { localStorage.setItem('mmjr.name', nm); } catch { /* ignore */ }
+    const nm = readInitials(); if (!nm) return;
     $('scoreForm').innerHTML = '<p style="margin:0">Posting…</p>';
     const ok = await LB.submit(name, nm, r.score);
     $('scoreForm').innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
