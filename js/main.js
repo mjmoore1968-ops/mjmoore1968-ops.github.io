@@ -615,6 +615,7 @@ let golf = null, panelFrom = 'world';
 function awardKey() {
   if (S.hasKey) return;
   S.hasKey = true; const k = $('key'); k.className = 'pop'; setTimeout(() => (k.className = 'dock'), 1800);
+  try { localStorage.setItem('mmjr.key', '1'); } catch { /* storage unavailable: the key lasts for this visit */ }
   toast('🔑 You won the front door key!', 3600);
 }
 function fadeThrough(mid) {
@@ -960,6 +961,8 @@ function frame(now) {
 showWorldHud(true);
 S.mode = 'world'; S.pos.copy(BED.stand); S.yaw = -Math.PI / 2 - 0.25; S.pitch = -0.05; S.roll = 0;
 S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
+// a key you already won on this device is still yours on later visits
+try { if (localStorage.getItem('mmjr.key') === '1') { S.hasKey = true; $('key').className = 'dock'; } } catch { /* ignore */ }
 requestAnimationFrame(frame);
 
 if (TEST) window.__g = { awardKey, goOutside, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
