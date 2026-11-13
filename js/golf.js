@@ -1,20 +1,17 @@
-// Story St. Golf Club: the outside world. Walk, drive the cart, and play nine holes over rolling hills.
+// Story St. Golf Club: the outside world. Walk, drive the cart, and play three signature holes over rolling hills.
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const G = 9.8, DEG = Math.PI / 180;
 
-// tee -> (optional dogleg) -> green, in metres. Par total 34.
+// Three signature holes. tee -> (doglegs) -> green, in metres. Par 12.
+//  1. The Island: a par 3 from a raised tee to a green ringed by water. There is nowhere to miss.
+//  2. The Drop: a par 4 from a tee high on a hill, dogleg right around a huge waste bunker, to a green sunk in a bowl.
+//  3. The Volcano: a par 5 that curls around a lake (cut the corner if you dare) up to a green on top of a cone.
 export const HOLES = [
-  { par: 4, pts: [[30, 30], [60, 285]] },
-  { par: 3, pts: [[95, 300], [215, 345]], pond: [0.55, 0, 16] },
-  { par: 4, pts: [[250, 330], [300, 50]] },
-  { par: 5, pts: [[330, 20], [420, 180], [360, 380]], pondAt: [392, 205, 17] },
-  { par: 3, pts: [[330, 420], [190, 470]], pond: [0.5, 0, 15] },
-  { par: 4, pts: [[150, 480], [-140, 420]], pond: [0.5, 30, 16] },
-  { par: 4, pts: [[-170, 400], [-220, 150]] },
-  { par: 3, pts: [[-200, 120], [-120, 215]] },
-  { par: 4, pts: [[-100, 330], [-20, 200], [-45, 50]], pondAt: [-66, 96, 12] },
+  { name: 'The Island', par: 3, pts: [[65, 65], [120, 190]], gr: 12, teeUp: 6, ponds: [[120, 190, 40, 18]], bunkers: [[113, 178, 3.2]] },
+  { name: 'The Drop', par: 4, pts: [[190, 120], [350, 150], [365, 310]], gr: 13, teeUp: 9, bowl: 2.6, bunkers: [[312, 192, 22], [383, 318, 5]] },
+  { name: 'The Volcano', par: 5, pts: [[300, 395], [160, 405], [25, 335], [-60, 185]], gr: 12.5, plateau: 7, ponds: [[160, 345, 42]], bunkers: [[-80, 196, 5], [-42, 196, 5], [-58, 162, 5]] },
 ];
 const CLUBS = [
   { id: 'D', name: 'Driver', carry: 205, loft: 12, head: 'wood' },
@@ -32,9 +29,9 @@ const CHECK = 2.5;                                   // a shot landing on the gr
 const SLOPE = 0.8;                                   // how strongly hills pull a rolling ball
 const CURVE = 7.5;                                   // sideways pull of a full hook or slice, m/s^2 at driver speed
 const PURE = 0.1;                                    // half-width of the "straight" zone on the accuracy bar
-const BOUNDS = { x0: -330, x1: 480, z0: -70, z1: 560 };
-const TX = { x0: -380, x1: 530, z0: -120, z1: 610 }; // terrain mesh extent
-const COL = { rough: '#2c6a2b', fair: '#63b548', fair2: '#70c254', fringe: '#7fcb58', green: '#a6e56c', tee: '#58ad49', sand: '#f1e3ae', sandRim: '#cdbb84', water: '#3d8fd6', bank: '#2a5c28', path: '#d6cdb6' };
+const BOUNDS = { x0: -240, x1: 420, z0: -70, z1: 500 };
+const TX = { x0: -280, x1: 460, z0: -120, z1: 540 }; // terrain mesh extent
+const COL = { rough: '#2c6a2b', fair: '#63b548', fair2: '#70c254', fringe: '#7fcb58', green: '#a6e56c', tee: '#58ad49', sand: '#f1e3ae', sandRim: '#cdbb84', ash: '#8f8983', ashRim: '#5f5a55', rock: '#5b4a3c', rock2: '#6f5a48', beach: '#e3d7a6', water: '#3d8fd6', bank: '#2a5c28', path: '#d6cdb6' };
 
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function segDist(px, pz, ax, az, bx, bz) {
@@ -57,21 +54,21 @@ export function createGolf(THREE, ctx) {
   const rng = mulberry(1977);
   const ponds = [], bunkers = [], holes = [];
   HOLES.forEach((H, n) => {
-    const P = H.pts, tee = P[0], green = P[P.length - 1], prev = P[P.length - 2];
+    const P = H.pts, tee = P[0], green = P[P.length - 1];
     let len = 0; for (let i = 1; i < P.length; i++) len += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
-    const gd = Math.hypot(green[0] - prev[0], green[1] - prev[1]), ux = (green[0] - prev[0]) / gd, uz = (green[1] - prev[1]) / gd;
-    const gr = 11.5 + rng() * 2.5, ca = rng() * 6.28, cr = rng() * gr * 0.42;
-    const h = { n, par: H.par, pts: P, tee, green, gr, len: Math.round(len), cup: [green[0] + Math.cos(ca) * cr, green[1] + Math.sin(ca) * cr] };
+    const gr = H.gr, ca = rng() * 6.28, cr = rng() * gr * 0.42;
+    const h = { n, name: H.name, par: H.par, pts: P, tee, green, gr, teeUp: H.teeUp || 0, bowl: H.bowl || 0, plateau: H.plateau || 0, len: Math.round(len), cup: [green[0] + Math.cos(ca) * cr, green[1] + Math.sin(ca) * cr] };
     const d0 = Math.hypot(P[1][0] - tee[0], P[1][1] - tee[1]), k = Math.min(0.6, 24 / d0);
     h.fair = [[tee[0] + (P[1][0] - tee[0]) * k, tee[1] + (P[1][1] - tee[1]) * k], ...P.slice(1)];
     h.dir0 = [(P[1][0] - tee[0]) / d0, (P[1][1] - tee[1]) / d0];
-    for (const s of [-1, 1]) bunkers.push({ x: green[0] - uz * s * (gr + 6.5) - ux * 5, z: green[1] + ux * s * (gr + 6.5) - uz * 5, r: 5.5 });
-    if (H.pond) { const [t, off, r] = H.pond; ponds.push({ x: tee[0] + (green[0] - tee[0]) * t - uz * off, z: tee[1] + (green[1] - tee[1]) * t + ux * off, r }); }
-    if (H.pondAt) ponds.push({ x: H.pondAt[0], z: H.pondAt[1], r: H.pondAt[2] });
+    for (const [x, z, r] of H.bunkers || []) bunkers.push({ x, z, r, ash: !!H.plateau });
+    for (const [x, z, r, island] of H.ponds || []) { ponds.push({ x, z, r, island: island || 0, y: 0 }); if (island) { h.island = true; h.fair = []; } }   // no fairway: it is all carry
     holes.push(h);
   });
+  // water is wherever the ground lies below a pond's surface, so what you see is exactly what counts (HT is defined below)
+  const inWater = (p, x, z, m = 0.03) => Math.hypot(x - p.x, z - p.z) < p.r + 6 && HT(x, z) < p.y - m;
   function surfaceAt(x, z) {
-    for (const p of ponds) if (Math.hypot(x - p.x, z - p.z) < p.r) return 'water';
+    for (const p of ponds) if (inWater(p, x, z)) return 'water';
     for (const h of holes) if (Math.hypot(x - h.green[0], z - h.green[1]) < h.gr) return 'green';
     for (const b of bunkers) if (Math.hypot(x - b.x, z - b.z) < b.r) return 'sand';
     for (const h of holes) if (Math.hypot(x - h.tee[0], z - h.tee[1]) < 5) return 'tee';
@@ -93,9 +90,23 @@ export function createGolf(THREE, ctx) {
     for (const f of flats) { const dx = x - f.x, dz = z - f.z; if (Math.abs(dx) < f.r1 && Math.abs(dz) < f.r1) { const d = Math.hypot(dx, dz); if (d < f.r1) h = lerp(f.h + (h - f.h) * f.k, h, smooth(f.r0, f.r1, d)); } }
     return h;
   }
-  for (const p of ponds) flats.push({ x: p.x, z: p.z, r0: p.r + 2, r1: p.r + 18, h: rawH(p.x, p.z) - 0.8, k: 0 });
-  for (const h of holes) flats.push({ x: h.tee[0], z: h.tee[1], r0: 7, r1: 18, h: designH(h.tee[0], h.tee[1]) + 0.4, k: 0 });
-  for (const h of holes) flats.push({ x: h.green[0], z: h.green[1], r0: h.gr + 3, r1: h.gr + 19, h: designH(h.green[0], h.green[1]), k: 0.3 });
+  // Ponds: the bed is sunk, and the water level sits just below the lowest ground around the rim, so the water
+  // surface always meets a bank and never hangs in the air.
+  for (const p of ponds) {
+    let low = 1e9; for (let a = 0; a < 6.283; a += 0.2) low = Math.min(low, rawH(p.x + Math.cos(a) * (p.r + 5), p.z + Math.sin(a) * (p.r + 5)));
+    p.y = low - 0.15; flats.push({ x: p.x, z: p.z, r0: p.r - 1, r1: p.r + 5, h: p.y - 1.2, k: 0 });
+    if (p.island) flats.push({ x: p.x, z: p.z, r0: p.island - 3, r1: p.island + 1.5, h: p.y + 1.3, k: 0.15 });      // the island rises out of the water
+  }
+  for (const h of holes) flats.push(h.teeUp
+    ? { x: h.tee[0], z: h.tee[1], r0: 9, r1: 48, h: designH(h.tee[0], h.tee[1]) + h.teeUp, k: 0 }                  // tee perched on a hill
+    : { x: h.tee[0], z: h.tee[1], r0: 7, r1: 18, h: designH(h.tee[0], h.tee[1]) + 0.4, k: 0 });
+  for (const h of holes) {
+    if (h.island) continue;                                                                                          // the island is already shaped
+    const gh = designH(h.green[0], h.green[1]);
+    if (h.plateau) flats.push({ x: h.green[0], z: h.green[1], r0: h.gr + 4, r1: h.gr + 22, h: gh + h.plateau, k: 0.25 });   // green on top of a cone
+    else if (h.bowl) flats.push({ x: h.green[0], z: h.green[1], r0: h.gr + 2, r1: h.gr + 32, h: gh - h.bowl, k: 0.25 });    // green at the bottom of a bowl
+    else flats.push({ x: h.green[0], z: h.green[1], r0: h.gr + 3, r1: h.gr + 19, h: gh, k: 0.3 });
+  }
   for (const b of bunkers) flats.push({ x: b.x, z: b.z, r0: b.r - 1, r1: b.r + 4, h: designH(b.x, b.z) - 0.45, k: 0.4 });
   const STEP = 2, GW = TX.x1 - TX.x0, GD = TX.z1 - TX.z0, NX = Math.floor(GW / STEP) + 1, NZ = Math.floor(GD / STEP) + 1, hm = new Float32Array(NX * NZ);
   for (let k = 0, i = 0; k < NZ; k++) for (let j = 0; j < NX; j++, i++) hm[i] = designH(TX.x0 + j * STEP, TX.z0 + k * STEP);
@@ -127,9 +138,11 @@ export function createGolf(THREE, ctx) {
         }
         c.restore();
       }
-      for (const p of ponds) { circ(p.x, p.z, p.r + 1.8, COL.bank); circ(p.x, p.z, p.r, COL.water); circ(p.x - p.r * 0.2, p.z - p.r * 0.2, p.r * 0.55, 'rgba(255,255,255,.13)'); }
+      for (const p of ponds) { circ(p.x, p.z, p.r + 5.5, COL.bank); circ(p.x, p.z, p.r + 1, COL.water); if (p.island) { circ(p.x, p.z, p.island + 1.2, COL.beach); circ(p.x, p.z, p.island - 0.6, COL.fair); } }
+      for (const h of holes) if (h.plateau) { circ(h.green[0], h.green[1], h.gr + 23, COL.rock); circ(h.green[0], h.green[1], h.gr + 14, COL.rock2); for (let i = 0; i < 26; i++) { const a = i * 2.4, d = h.gr + 6 + (i * 7 % 15); circ(h.green[0] + Math.cos(a) * d, h.green[1] + Math.sin(a) * d, 1.2 + (i % 3) * 0.6, i % 2 ? 'rgba(0,0,0,.18)' : 'rgba(255,220,180,.1)'); } }
       for (const h of holes) { circ(h.green[0], h.green[1], h.gr + 3.4, 'rgba(255,255,255,.25)'); circ(h.green[0], h.green[1], h.gr + 3, COL.fringe); circ(h.green[0], h.green[1], h.gr, COL.green); circ(h.tee[0], h.tee[1], 5.4, 'rgba(255,255,255,.3)'); circ(h.tee[0], h.tee[1], 5, COL.tee); }
-      for (const b of bunkers) { circ(b.x, b.z, b.r + 0.6, COL.sandRim); circ(b.x, b.z, b.r - 0.2, COL.sand); }
+      for (const b of bunkers) { circ(b.x, b.z, b.r + 0.6, b.ash ? COL.ashRim : COL.sandRim); circ(b.x, b.z, b.r - 0.2, b.ash ? COL.ash : COL.sand); }
+      { const wb = bunkers.find(b => b.r > 15); if (wb) { const r3 = mulberry(3); for (let i = 0; i < 60; i++) { const a = r3() * 6.28, d = r3() * (wb.r - 2); circ(wb.x + Math.cos(a) * d, wb.z + Math.sin(a) * d, 0.5 + r3() * 1.4, r3() < 0.5 ? 'rgba(160,140,90,.35)' : 'rgba(255,255,255,.25)'); } } }   // ripples in the waste bunker
       c.fillStyle = COL.path; c.fillRect(X(-3), Z(-7), 6 * s, 26 * s); circ(6, 18, 9, COL.path);
     });
     map.anisotropy = 8;
@@ -142,6 +155,18 @@ export function createGolf(THREE, ctx) {
     // at its edges, so the strips meet it cleanly. A single sheet under the course would hide every valley.)
     const R = 3000, fm = L(0x2c6a2b), strip = (x0, x1, z0, z1) => { const m = add(new THREE.PlaneGeometry(x1 - x0, z1 - z0), fm, (x0 + x1) / 2, -0.02, (z0 + z1) / 2); m.rotation.x = -Math.PI / 2; };
     strip(-R, TX.x0, -R, R); strip(TX.x1, R, -R, R); strip(TX.x0, TX.x1, -R, TX.z0); strip(TX.x0, TX.x1, TX.z1, R);
+  }
+
+  /* ---------------------------------------------------------------- water, and the island's footbridge */
+  for (const p of ponds) {
+    const w = add(new THREE.CircleGeometry(p.r + 5, 56), new THREE.MeshLambertMaterial({ color: 0x3d8fd6, transparent: true, opacity: 0.86 }), p.x, p.y, p.z); w.rotation.x = -Math.PI / 2;
+    if (!p.island) continue;
+    const h = holes.find(o => o.island), d = Math.hypot(h.tee[0] - p.x, h.tee[1] - p.z), ux = (h.tee[0] - p.x) / d, uz = (h.tee[1] - p.z) / d;
+    const a0 = p.island - 1, a1 = p.r + 4.5, len = a1 - a0, mid = (a0 + a1) / 2, br = new THREE.Group();
+    br.position.set(p.x + ux * mid, p.y + 1.15, p.z + uz * mid); br.rotation.y = Math.atan2(ux, uz); scene.add(br);
+    bx(br, 2.2, 0.14, len, 0x8a6a4a, 0, 0, 0);
+    for (let i = 0; i <= 6; i++) { const z = -len / 2 + (len * i) / 6; for (const sx of [-1, 1]) { bx(br, 0.12, 1.0, 0.12, 0x6b4a2f, sx * 1.05, 0.5, z); bx(br, 0.16, 2.2, 0.16, 0x5d4632, sx * 1.05, -1.1, z); } }
+    for (const sx of [-1, 1]) bx(br, 0.08, 0.08, len, 0x6b4a2f, sx * 1.05, 0.95, 0);
   }
 
   /* ---------------------------------------------------------------- flags, tee markers, signs */
@@ -158,7 +183,7 @@ export function createGolf(THREE, ctx) {
     const sx = h.tee[0] + px * 5 - h.dir0[0] * 2, sz = h.tee[1] + pz * 5 - h.dir0[1] * 2;
     const sg = new THREE.Group(); sg.position.set(sx, HT(sx, sz), sz); sg.rotation.y = Math.atan2(-h.dir0[0], -h.dir0[1]); scene.add(sg);
     bx(sg, 0.12, 1.2, 0.12, 0x5d4632, 0, 0.6, 0); bx(sg, 1.5, 0.9, 0.08, 0x1f4e2f, 0, 1.55, 0);
-    const st = canvasTex(256, 150, (c, W, Hh) => { c.fillStyle = '#1f4e2f'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#f2d98a'; c.textAlign = 'center'; c.font = 'bold 60px Georgia, serif'; c.fillText(`HOLE ${h.n + 1}`, W / 2, 62); c.fillStyle = '#fff'; c.font = 'bold 34px Georgia, serif'; c.fillText(`Par ${h.par} · ${h.len} m`, W / 2, 118); });
+    const st = canvasTex(256, 150, (c, W, Hh) => { c.fillStyle = '#1f4e2f'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#f2d98a'; c.textAlign = 'center'; c.font = 'bold 40px Georgia, serif'; c.fillText(`HOLE ${h.n + 1}`, W / 2, 44); c.font = 'bold 34px Georgia, serif'; c.fillText(h.name, W / 2, 88); c.fillStyle = '#fff'; c.font = 'bold 28px Georgia, serif'; c.fillText(`Par ${h.par} · ${h.len} m`, W / 2, 128); });
     for (const s of [-1, 1]) { const p = add(new THREE.PlaneGeometry(1.4, 0.82), new THREE.MeshBasicMaterial({ map: st }), 0, 1.55, 0.045 * s, sg); if (s < 0) p.rotation.y = Math.PI; }
   }
 
@@ -167,7 +192,9 @@ export function createGolf(THREE, ctx) {
   for (let i = 0; i < 1400 && trees.length < 300; i++) {
     const x = lerp(BOUNDS.x0 + 10, BOUNDS.x1 - 10, rng()), z = lerp(BOUNDS.z0 + 10, BOUNDS.z1 - 10, rng());
     if (Math.abs(x) < 60 && z < 40) continue;
-    if (ponds.some(p => Math.hypot(x - p.x, z - p.z) < p.r + 7)) continue;
+    if (ponds.some(p => Math.hypot(x - p.x, z - p.z) < p.r + 10)) continue;
+    if (bunkers.some(b => Math.hypot(x - b.x, z - b.z) < b.r + 4)) continue;
+    if (holes.some(h => (h.teeUp && Math.hypot(x - h.tee[0], z - h.tee[1]) < 30) || ((h.plateau || h.bowl) && Math.hypot(x - h.green[0], z - h.green[1]) < h.gr + 36))) continue;
     if (holes.some(h => { for (let k = 1; k < h.pts.length; k++) if (segDist(x, z, h.pts[k - 1][0], h.pts[k - 1][1], h.pts[k][0], h.pts[k][1]) < 27) return true; return Math.hypot(x - h.green[0], z - h.green[1]) < h.gr + 16; })) continue;
     trees.push({ x, z, s: 0.75 + rng() * 0.7, y: HT(x, z) });
   }
@@ -242,7 +269,7 @@ export function createGolf(THREE, ctx) {
     px: 0, pz: 3, yaw: Math.PI, pitch: -0.02, led: false, hole: 0, strokes: 0, card: [],
     ball: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, mode: 'rest', bounced: 0, spin: 0 }, last: [0, 0],
     aim: 0, club: 0, cT: 0, power: 0, accT: 0, swingT: 0, flT: 0, shotAim: 0, shotClub: 0, msg: '', msgT: 0, sub: '', t: 0, endT: 0, shotFrom: [0, 0],
-    prevF: 0, done: false, pen: false, prompt: null, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
+    prevF: 0, done: false, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
   };
   const hole = () => holes[S.hole];
   const say = (m, sub = '', t = 2.6) => { S.msg = m; S.sub = sub; S.msgT = t; };
@@ -252,12 +279,14 @@ export function createGolf(THREE, ctx) {
     if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) return true;
     if (Math.abs(x) < 24 + r && z > -29 - r && z < -11.5 + r) return true;            // clubhouse
     if (Math.abs(x) < 9.5 + r && z > -12 && z < -6.6 + r) return true;                 // portico
-    for (const p of ponds) if (Math.hypot(x - p.x, z - p.z) < p.r - 0.6 + r * 0.3) return true;
+    for (const p of ponds) if (inWater(p, x, z, -0.12)) return true;                 // water blocks you; the island itself is walkable
     for (const t of trees) if (Math.abs(x - t.x) < 2 && Math.abs(z - t.z) < 2 && Math.hypot(x - t.x, z - t.z) < 0.5 * t.s + r) return true;
     return false;
   }
+  const shotDist = () => (S.toCorner ? S.tgtD : distToCup());
+  const shotRise = () => (S.toCorner ? S.tgtY : HT(hole().cup[0], hole().cup[1])) - S.ball.y;      // + uphill, - downhill
   function pickClub() {
-    const d = distToCup(), surf = surfaceAt(S.ball.x, S.ball.z);
+    const d = Math.max(1, shotDist() + shotRise() * 1.8), surf = surfaceAt(S.ball.x, S.ball.z);
     if (surf === 'green') return 6;
     if (d < 30) return 5;
     if (surf === 'tee' && d > 190) return 0;
@@ -266,7 +295,7 @@ export function createGolf(THREE, ctx) {
   }
   // putts: release at 60% for perfect weight; uphill needs more, downhill less
   function putterMax() { const h = hole(), d = distToCup(), dh = HT(h.cup[0], h.cup[1]) - HT(S.ball.x, S.ball.z); return clamp(d + SLOPE * G * dh / ROLL.green, 1.5, 60) / 0.6; }
-  const needPower = c => (c.putter ? 0.6 : clamp((c.short ? distToCup() * 0.85 : distToCup() * 0.94) / c.carry, 0, 1.2));
+  const needPower = c => (c.putter ? 0.6 : clamp(((c.short ? shotDist() * 0.85 : shotDist() * 0.94) + shotRise() / Math.tan(c.loft * DEG)) / c.carry, 0.04, 1.2));
   // the accuracy line sweeps left-right-left; -1 is far left (hook), +1 far right (slice), 0 is dead straight
   const accPos = () => { const t = (S.accT / 0.62) % 2; return t < 1 ? -1 + 2 * t : 3 - 2 * t; };
   function launch(b, c, p, a, lie, spin = 0) {
@@ -312,12 +341,17 @@ export function createGolf(THREE, ctx) {
   }
   function parkCartNear() {                             // the cart follows you when you skip ahead with E
     const a = S.aim, ax = Math.sin(a), az = Math.cos(a), lx = Math.cos(a), lz = -Math.sin(a);
-    for (const [bk, sd] of [[7, -5], [7, 5], [10, -7], [10, 7], [13, 0]]) { const x = S.ball.x - ax * bk + lx * sd, z = S.ball.z - az * bk + lz * sd; if (!blockedAt(x, z, 1.6) && surfaceAt(x, z) !== 'green' && surfaceAt(x, z) !== 'sand') { cart.x = x; cart.z = z; cart.h = a; cart.v = 0; return; } }
+    for (const [bk, sd] of [[7, -5], [7, 5], [10, -7], [10, 7], [13, 0]]) { const x = S.ball.x - ax * bk + lx * sd, z = S.ball.z - az * bk + lz * sd; if (!blockedAt(x, z, 1.6) && surfaceAt(x, z) !== 'green' && surfaceAt(x, z) !== 'sand' && !ponds.some(q => Math.hypot(x - q.x, z - q.z) < q.r + 3)) { cart.x = x; cart.z = z; cart.h = a; cart.v = 0; return; } }
   }
   function address() {
     if (S.done) return;
-    const h = hole(); let tx = h.cup[0], tz = h.cup[1];
-    if (h.pts.length === 3) { const w = h.pts[1], dw = Math.hypot(w[0] - h.cup[0], w[1] - h.cup[1]); if (distToCup() > dw + 35) { tx = w[0]; tz = w[1]; } }
+    const h = hole(); let tx = h.cup[0], tz = h.cup[1]; S.toCorner = false;
+    // on a dogleg, aim at the next corner of the fairway until the green is in range
+    if (h.pts.length > 2 && distToCup() > 215) {
+      let best = 0, bd = 1e9; for (let i = 1; i < h.pts.length; i++) { const d = segDist(S.ball.x, S.ball.z, h.pts[i - 1][0], h.pts[i - 1][1], h.pts[i][0], h.pts[i][1]); if (d < bd - 0.01) { bd = d; best = i; } }
+      let w = h.pts[best]; if (best < h.pts.length - 1 && Math.hypot(w[0] - S.ball.x, w[1] - S.ball.z) < 70) w = h.pts[++best];
+      if (best < h.pts.length - 1) { tx = w[0]; tz = w[1]; S.toCorner = true; S.tgtD = Math.hypot(tx - S.ball.x, tz - S.ball.z); S.tgtY = HT(tx, tz); }
+    }
     S.aim = Math.atan2(tx - S.ball.x, tz - S.ball.z); S.club = pickClub(); S.phase = 'aim'; S.power = 0; S.state = 'address'; S.prevF = 0; S.snap = true;
     trailN = 0; trail.geometry.setDrawRange(0, 0);
   }
@@ -420,15 +454,16 @@ export function createGolf(THREE, ctx) {
     c.fillStyle = COL.rough; c.fillRect(0, 0, mapBase.width, mapBase.height);
     c.lineCap = c.lineJoin = 'round';
     for (const o of holes) { c.strokeStyle = o === h ? COL.fair : 'rgba(99,181,72,.35)'; c.lineWidth = r(30); c.beginPath(); o.fair.forEach(([x, z], i) => { const [px, py] = toMap(x, z); i ? c.lineTo(px, py) : c.moveTo(px, py); }); c.stroke(); }
-    for (const p of ponds) circ(p.x, p.z, p.r, COL.water);
+    for (const p of ponds) { circ(p.x, p.z, p.r, COL.water); if (p.island) circ(p.x, p.z, p.island, COL.fair); }
+    if (h.plateau) circ(h.green[0], h.green[1], h.gr + 20, COL.rock);
     for (const o of holes) { circ(o.green[0], o.green[1], o.gr + 3, o === h ? COL.fringe : 'rgba(127,203,88,.4)'); if (o === h) circ(o.green[0], o.green[1], o.gr, COL.green); }
     for (const b of bunkers) circ(b.x, b.z, b.r, COL.sand);
     circ(h.tee[0], h.tee[1], 5, '#ffffff');
     const [fx, fy] = toMap(h.cup[0], h.cup[1]); c.strokeStyle = '#fff'; c.lineWidth = 1.5 * MS; c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx, fy - 11 * MS); c.stroke();
     c.fillStyle = '#e02f2a'; c.beginPath(); c.moveTo(fx, fy - 11 * MS); c.lineTo(fx + 7 * MS, fy - 8.5 * MS); c.lineTo(fx, fy - 6 * MS); c.fill();
     c.restore();
-    c.fillStyle = '#f2b441'; c.font = `bold ${12.5 * MS}px ui-sans-serif, system-ui, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left'; c.fillText(`HOLE ${h.n + 1}`, 9 * MS, 13 * MS);
-    c.fillStyle = '#f4efe6'; c.font = `${11 * MS}px ui-sans-serif, system-ui, sans-serif`; c.textAlign = 'right'; c.fillText(`Par ${h.par} · ${h.len} m`, mapBase.width - 9 * MS, 13 * MS);
+    c.fillStyle = '#f2b441'; c.font = `bold ${12.5 * MS}px ui-sans-serif, system-ui, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left'; c.fillText(`${h.n + 1} · ${h.name}`, 9 * MS, 13 * MS);
+    c.fillStyle = '#f4efe6'; c.font = `${11 * MS}px ui-sans-serif, system-ui, sans-serif`; c.textAlign = 'right'; c.fillText(`Par ${h.par}`, mapBase.width - 9 * MS, 13 * MS);
     mapHole = S.hole;
   }
   function drawMap() {
@@ -585,7 +620,7 @@ export function createGolf(THREE, ctx) {
       if (S.msgT > 0) html += `<div class="g-msg">${S.msg}${S.sub ? `<small>${S.sub}</small>` : ''}</div>`;
       if (addr) {
         const need = needPower(c), dh = HT(cu[0], cu[1]) - b.y, ap = accPos(), acc = S.phase === 'acc';
-        html += `<div class="g-side left"><b style="color:#f2b441">${c.name}</b><br>${c.putter ? `Putt &nbsp;${dcup.toFixed(1)} m` : `Max &nbsp;&nbsp;${c.carry} m carry`}<br>Pin &nbsp;&nbsp;${dcup.toFixed(dcup < 20 ? 1 : 0)} m<br>Elev &nbsp;${dh >= 0 ? '+' : ''}${dh.toFixed(1)} m ${Math.abs(dh) < 0.15 ? '' : dh > 0 ? 'uphill' : 'downhill'}<br>Lie &nbsp;&nbsp;${surf}</div>
+        html += `<div class="g-side left"><b style="color:#f2b441">${c.name}</b><br>${c.putter ? `Putt &nbsp;${dcup.toFixed(1)} m` : `Max &nbsp;&nbsp;${c.carry} m carry`}<br>Pin &nbsp;&nbsp;${dcup.toFixed(dcup < 20 ? 1 : 0)} m${S.toCorner ? `<br>Aim &nbsp;&nbsp;corner, ${S.tgtD.toFixed(0)} m` : ''}<br>Elev &nbsp;${dh >= 0 ? '+' : ''}${dh.toFixed(1)} m ${Math.abs(dh) < 0.15 ? '' : dh > 0 ? 'uphill' : 'downhill'}<br>Lie &nbsp;&nbsp;${surf}</div>
           <div class="g-clubs">${CLUBS.map((k, i) => `<span class="${i === S.club ? 'on' : ''}">${k.id}</span>`).join('')}</div>
           <div class="g-bar golf${Math.abs(S.power - need) < 0.07 && S.phase !== 'aim' ? ' hot' : ''}"><i style="width:${Math.round(S.power * 100)}%"></i>${need <= 1 ? `<u style="left:${Math.round(need * 100)}%"></u>` : ''}<em>POWER</em></div>
           <div class="g-acc${acc ? ' live' : ''}"><span></span>${acc ? `<u style="left:${(50 + ap * 50).toFixed(1)}%"></u>` : ''}<em>${c.putter ? 'PULL · STRAIGHT · PUSH' : 'HOOK · STRAIGHT · SLICE'}</em></div>

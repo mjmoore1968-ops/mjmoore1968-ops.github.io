@@ -36,8 +36,16 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0d14);
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 120);
 camera.rotation.order = 'YXZ';
-scene.add(new THREE.HemisphereLight(0xfff3df, 0x4a4038, 1.5));
-scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+scene.add(new THREE.HemisphereLight(0xfff3df, 0x4a4038, 1.2));
+scene.add(new THREE.AmbientLight(0xffffff, 0.34));
+// One soft "daylight" that casts shadows across both rooms. Walls and ceilings receive shadows but do not cast
+// them, so the light reads as coming through the windows and furniture gets grounded contact shadows.
+// (Phones skip the shadow pass to stay smooth.)
+renderer.shadowMap.enabled = !TOUCH; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+{ const sunIn = new THREE.DirectionalLight(0xfff1dc, 1.15); sunIn.position.set(4.5, 11, 3.2); sunIn.target.position.set(7, 0, 0);
+  sunIn.castShadow = !TOUCH; const sc = sunIn.shadow.camera; sc.left = -13; sc.right = 13; sc.top = 9; sc.bottom = -9; sc.near = 1; sc.far = 30;
+  sunIn.shadow.mapSize.set(TOUCH ? 1024 : 2048, TOUCH ? 1024 : 2048); sunIn.shadow.bias = -0.0004; sunIn.shadow.normalBias = 0.03; sunIn.shadow.radius = 3;
+  scene.add(sunIn, sunIn.target); }
 
 /* ------------------------------------------------------------------ builders */
 let MX = x => x, MZ = z => z;                 // position mapping for anything added straight to the scene
@@ -53,15 +61,15 @@ const col = (cx, cz, w, d) => { cx = MX(cx); cz = MZ(cz); const c = { x0: cx - w
 
 function box(parent, w, h, d, color, x, y, z, o) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'object' ? color : mat(color, o));
-  m.position.set(mx(parent, x), y, mz(parent, z)); parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
 }
 function cyl(parent, rt, rb, h, color, x, y, z, seg = 16, o) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), typeof color === 'object' ? color : mat(color, o));
-  m.position.set(mx(parent, x), y, mz(parent, z)); parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
 }
 function sph(parent, r, color, x, y, z, o) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat(color, o));
-  m.position.set(mx(parent, x), y, mz(parent, z)); parent.add(m); return m;
+  m.position.set(mx(parent, x), y, mz(parent, z)); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
 }
 function tex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -79,17 +87,66 @@ const interactables = [];
 function interact(g, label, fn) { g.userData.interact = { label, fn }; interactables.push(g); }
 
 // skip: 'px' or 'nx' leaves that wall out (the shared wall with the doorway is built by hand)
+// wood plank floor, drawn once per room and tiled
+function woodFloor(w, d, base) {
+  const t = tex(512, 512, (c, W, H) => {
+    const r = (() => { let a = 99; return () => (a = (a * 16807) % 2147483647) / 2147483647; })();
+    c.fillStyle = base; c.fillRect(0, 0, W, H);
+    for (let row = 0; row < 8; row++) {
+      const y = row * 64; let x = -r() * 200;
+      while (x < W) { const len = 150 + r() * 190, v = Math.round((r() - 0.5) * 34); c.fillStyle = v > 0 ? `rgba(255,236,200,${v / 220})` : `rgba(40,20,5,${-v / 170})`; c.fillRect(x, y, len, 64);
+        c.strokeStyle = 'rgba(60,35,15,.16)'; c.lineWidth = 1; for (let g = 0; g < 4; g++) { const gy = y + 8 + r() * 48; c.beginPath(); c.moveTo(x + 4, gy); c.bezierCurveTo(x + len * 0.3, gy + r() * 5 - 2.5, x + len * 0.7, gy + r() * 5 - 2.5, x + len - 4, gy); c.stroke(); }
+        c.fillStyle = 'rgba(30,16,6,.55)'; c.fillRect(x + len - 1.5, y, 2, 64); x += len; }
+      c.fillStyle = 'rgba(30,16,6,.5)'; c.fillRect(0, y, W, 2);
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / 1.5, d / 1.5); t.anisotropy = 8;
+  return new THREE.MeshLambertMaterial({ map: t });
+}
+const noCast = m => { m.castShadow = false; return m; };
+// skip: 'px' or 'nx' leaves that wall out (the shared wall with the doorway is built by hand)
 function room(cx, cz, w, d, h, floorC, wallC, ceilC, skip) {
-  box(scene, w, 0.2, d, floorC, cx, -0.1, cz);
-  box(scene, w, 0.2, d, ceilC, cx, h + 0.1, cz);
-  box(scene, w, h, 0.2, wallC, cx, h / 2, cz - d / 2 - 0.1); col(cx, cz - d / 2 - 0.1, w + 1, 0.2);
-  box(scene, w, h, 0.2, wallC, cx, h / 2, cz + d / 2 + 0.1); col(cx, cz + d / 2 + 0.1, w + 1, 0.2);
+  noCast(box(scene, w, 0.2, d, floorC, cx, -0.1, cz));
+  noCast(box(scene, w, 0.2, d, ceilC, cx, h + 0.1, cz));
+  noCast(box(scene, w, h, 0.2, wallC, cx, h / 2, cz - d / 2 - 0.1)); col(cx, cz - d / 2 - 0.1, w + 1, 0.2);
+  noCast(box(scene, w, h, 0.2, wallC, cx, h / 2, cz + d / 2 + 0.1)); col(cx, cz + d / 2 + 0.1, w + 1, 0.2);
   for (const [s, key] of [[-1, 'nx'], [1, 'px']]) {
     if (skip === key) continue;
-    box(scene, 0.2, h, d, wallC, cx + s * (w / 2 + 0.1), h / 2, cz); col(cx + s * (w / 2 + 0.1), cz, 0.2, d + 1);
-    box(scene, 0.03, 0.1, d, 0xf5f1e8, cx + s * (w / 2 - 0.015), 0.05, cz);
+    noCast(box(scene, 0.2, h, d, wallC, cx + s * (w / 2 + 0.1), h / 2, cz)); col(cx + s * (w / 2 + 0.1), cz, 0.2, d + 1);
+    noCast(box(scene, 0.03, 0.1, d, 0xf5f1e8, cx + s * (w / 2 - 0.015), 0.05, cz));
   }
-  for (const s of [-1, 1]) box(scene, w, 0.1, 0.03, 0xf5f1e8, cx, 0.05, cz + s * (d / 2 - 0.015));
+  for (const s of [-1, 1]) noCast(box(scene, w, 0.1, 0.03, 0xf5f1e8, cx, 0.05, cz + s * (d / 2 - 0.015)));
+  // crown molding
+  for (const s of [-1, 1]) { noCast(box(scene, w, 0.09, 0.07, 0xf8f5ee, cx, h - 0.045, cz + s * (d / 2 - 0.035))); noCast(box(scene, 0.07, 0.09, d, 0xf8f5ee, cx + s * (w / 2 - 0.035), h - 0.045, cz)); }
+}
+// small decor helpers
+function frameArt(parent, x, y, z, ry, w, h, seed, frameC = 0x1f1f22) {
+  const g = group(x, y, z, parent); g.rotation.y = ry;
+  noCast(box(g, w + 0.07, h + 0.07, 0.03, frameC, 0, 0, 0)); noCast(box(g, w + 0.01, h + 0.01, 0.012, 0xfaf7f0, 0, 0, 0.012));
+  const pal = [['#e76f51', '#264653', '#e9c46a'], ['#2a9d8f', '#f4a261', '#1d3557'], ['#9b1c2c', '#f1e3c6', '#22333b'], ['#3d5a80', '#ee6c4d', '#e0fbfc'], ['#606c38', '#dda15e', '#283618']][seed % 5];
+  const t = tex(200, Math.round(200 * h / w), (c, W, H) => {
+    c.fillStyle = '#f6f1e6'; c.fillRect(0, 0, W, H);
+    if (seed % 3 === 0) { c.fillStyle = pal[0]; c.beginPath(); c.arc(W * 0.42, H * 0.42, W * 0.26, 0, 7); c.fill(); c.fillStyle = pal[1]; c.fillRect(W * 0.5, H * 0.5, W * 0.34, H * 0.34); c.fillStyle = pal[2]; c.fillRect(W * 0.14, H * 0.78, W * 0.6, H * 0.06); }
+    else if (seed % 3 === 1) { for (let i = 0; i < 5; i++) { c.fillStyle = pal[i % 3]; c.beginPath(); c.moveTo(0, H * (0.35 + i * 0.13)); c.bezierCurveTo(W * 0.3, H * (0.2 + i * 0.13), W * 0.7, H * (0.5 + i * 0.13), W, H * (0.3 + i * 0.13)); c.lineTo(W, H); c.lineTo(0, H); c.fill(); } c.fillStyle = pal[2]; c.beginPath(); c.arc(W * 0.72, H * 0.2, W * 0.1, 0, 7); c.fill(); }
+    else { c.strokeStyle = pal[1]; c.lineWidth = 5; for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(W / 2, H * 0.95, W * (0.12 + i * 0.11), Math.PI, 0); c.stroke(); } c.fillStyle = pal[0]; c.fillRect(W * 0.12, H * 0.1, W * 0.2, H * 0.2); }
+  });
+  plane(g, w * 0.86, h * 0.86, t, 0, 0, 0.02, 0, false);
+  return g;
+}
+function rugTex(a, b, c3) {
+  const t = tex(512, 512, (c, W, H) => {
+    c.fillStyle = a; c.fillRect(0, 0, W, H); c.strokeStyle = b; c.lineWidth = 14; c.strokeRect(26, 26, W - 52, H - 52); c.lineWidth = 4; c.strokeRect(54, 54, W - 108, H - 108);
+    c.fillStyle = c3; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) { const x = 112 + i * 72, y = 112 + j * 72; c.beginPath(); c.moveTo(x, y - 22); c.lineTo(x + 22, y); c.lineTo(x, y + 22); c.lineTo(x - 22, y); c.fill(); }
+    c.fillStyle = b; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { c.beginPath(); c.arc(148 + i * 72, 148 + j * 72, 5, 0, 7); c.fill(); }
+    for (let i = 0; i < 2600; i++) { c.fillStyle = i % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)'; c.fillRect((i * 7919) % W, (i * 104729) % H, 2, 2); }
+  });
+  return new THREE.MeshLambertMaterial({ map: t });
+}
+function curtains(x, y, z, ry, w, h) {            // rod and two fabric panels for a window centred at x,y,z
+  const g = group(x, y, z); g.rotation.y = ry;
+  cyl(g, 0.018, 0.018, w + 1.0, 0x2a2a2a, 0, h / 2 + 0.22, 0.1, 8).rotation.z = Math.PI / 2;
+  for (const s of [-1, 1]) { sph(g, 0.035, 0x2a2a2a, s * (w / 2 + 0.5), h / 2 + 0.22, 0.1);
+    for (let i = 0; i < 4; i++) noCast(box(g, 0.1, h + 0.75, 0.05, i % 2 ? 0xe9dfcd : 0xdccfb8, s * (w / 2 + 0.1 + i * 0.09), -0.16, 0.1 + (i % 2) * 0.02)); }
 }
 function lamp(x, y, z, intensity = 14, color = 0xffd9a0) {
   const l = new THREE.PointLight(color, intensity, 16, 1.6); l.position.set(MX(x), y, MZ(z)); scene.add(l); return l;
@@ -168,37 +225,72 @@ function sign(text, w, h, bg, fg, font = 'Georgia, serif', border = true) {
 const BED = { lie: new THREE.Vector3(-2.5, 0.78, -2.25), stand: new THREE.Vector3(-1.15, 1.62, -1.1) };
 const DOOR = { z0: 0.75, z1: 1.85, x: 3.6, open: false, t: 0, group: null, col: null };
 (function bedroom() {
-  room(0, 0, 7, 6, 2.8, 0x8a6a4a, 0xcbd3cf, 0xf3f0ea, 'px');
-  lamp(0, 1.9, 0, 9);
-  cyl(scene, 0.22, 0.3, 0.12, 0xf5f1e8, 0, 2.74, 0, 16, { emissive: 0xffe6b0, emissiveIntensity: 0.9 });
+  room(0, 0, 7, 6, 2.8, woodFloor(7, 6, '#b0845a'), 0xdcd8cd, 0xf5f2ec, 'px');
+  noCast(box(scene, 7, 2.71, 0.02, 0x2f4a5a, 0, 1.355, -2.99));                          // deep teal accent wall behind the bed
+  // pendant light
+  lamp(0, 1.9, 0, 8);
+  cyl(scene, 0.008, 0.008, 0.45, 0x222222, 0, 2.57, 0, 6); noCast(cyl(scene, 0.3, 0.36, 0.26, 0xf2e8d5, 0, 2.24, 0, 24, { emissive: 0xffe6b0, emissiveIntensity: 0.75 }));
   // bed (head against the -z wall)
-  box(scene, 1.7, 0.3, 2.2, 0x5d4632, -2.5, 0.15, -1.85);
-  box(scene, 1.6, 0.22, 2.1, 0xf2efe8, -2.5, 0.41, -1.85);
-  box(scene, 1.64, 0.12, 1.35, 0x3d5a80, -2.5, 0.5, -1.45);
-  box(scene, 1.7, 0.95, 0.1, 0x5d4632, -2.5, 0.6, -2.93);
-  box(scene, 0.62, 0.13, 0.4, 0xffffff, -2.88, 0.58, -2.6); box(scene, 0.62, 0.13, 0.4, 0xffffff, -2.12, 0.58, -2.6);
+  box(scene, 1.74, 0.26, 2.24, 0x4a3626, -2.5, 0.17, -1.85);
+  for (const [dx, dz] of [[-.8, -1.05], [.8, -1.05], [-.8, 1.05], [.8, 1.05]]) box(scene, 0.07, 0.08, 0.07, 0x2c2018, -2.5 + dx, 0.04, -1.85 + dz);
+  box(scene, 1.62, 0.22, 2.12, 0xf4f1ea, -2.5, 0.41, -1.85);                            // mattress
+  box(scene, 1.7, 0.13, 1.56, 0xe6e0d2, -2.5, 0.565, -1.5);                             // duvet
+  box(scene, 1.7, 0.15, 0.26, 0xfbfaf6, -2.5, 0.58, -2.2);                              // folded-back sheet
+  box(scene, 1.74, 0.05, 0.52, 0xd9a441, -2.5, 0.655, -1.02);                           // throw blanket
+  for (const sx of [-1, 1]) box(scene, 0.03, 0.3, 0.52, 0xd9a441, -2.5 + sx * 0.87, 0.5, -1.02);
+  box(scene, 1.8, 1.2, 0.12, 0x8c7b6b, -2.5, 0.75, -2.92);                              // upholstered headboard
+  for (const dx of [-0.45, 0, 0.45]) noCast(box(scene, 0.012, 0.9, 0.01, 0x75665a, -2.5 + dx, 0.85, -2.856));
+  for (const dx of [-0.4, 0.4]) { const p = box(scene, 0.66, 0.16, 0.42, 0xffffff, -2.5 + dx, 0.66, -2.56); p.rotation.x = -0.25; }
+  { const a = box(scene, 0.42, 0.34, 0.12, 0x2f4a5a, -2.72, 0.76, -2.34); a.rotation.x = -0.4; const b = box(scene, 0.4, 0.3, 0.12, 0xb8573a, -2.26, 0.74, -2.3); b.rotation.x = -0.45; b.rotation.y = 0.2; }
   col(-2.5, -1.85, 1.7, 2.2);
+  for (let i = 0; i < 3; i++) frameArt(scene, -3.08 + i * 0.58, 2.02, -2.975, 0, 0.42, 0.56, i + 1, 0xd9b34a);
+  // nightstand, lamp, books, clock
   box(scene, 0.5, 0.5, 0.45, 0x6b4a2f, -1.35, 0.25, -2.72); col(-1.35, -2.72, 0.5, 0.45);
-  cyl(scene, 0.05, 0.08, 0.22, 0x333333, -1.35, 0.61, -2.72);
-  cyl(scene, 0.1, 0.16, 0.2, 0xfff0cc, -1.35, 0.8, -2.72, 16, { emissive: 0xffd68a, emissiveIntensity: 0.9 });
+  noCast(box(scene, 0.42, 0.16, 0.01, 0x7d5a3c, -1.35, 0.33, -2.492)); sph(scene, 0.018, 0xd9b34a, -1.35, 0.33, -2.48);
+  cyl(scene, 0.05, 0.08, 0.22, 0x333333, -1.4, 0.61, -2.76);
+  noCast(cyl(scene, 0.1, 0.16, 0.2, 0xfff0cc, -1.4, 0.8, -2.76, 16, { emissive: 0xffd68a, emissiveIntensity: 0.9 }));
   lamp(-1.35, 1.0, -2.5, 4);
+  [0x264653, 0xe76f51, 0xe9c46a].forEach((c, i) => box(scene, 0.2 - i * 0.015, 0.03, 0.14, c, -1.2, 0.515 + i * 0.03, -2.6));
+  box(scene, 0.13, 0.07, 0.05, 0x15171c, -1.5, 0.535, -2.56); noCast(box(scene, 0.09, 0.03, 0.005, 0x7cf0a8, -1.5, 0.537, -2.533, { emissive: 0x39d98a }));
+  // dresser, with a round mirror and a few things on top
   box(scene, 1.7, 0.95, 0.5, 0x6b4a2f, 1.4, 0.475, -2.7); col(1.4, -2.7, 1.7, 0.5);
-  for (let i = 0; i < 3; i++) for (const s of [-0.42, 0.42]) box(scene, 0.72, 0.24, 0.02, 0x7d5a3c, 1.4 + s, 0.2 + i * 0.29, -2.44);
-  box(scene, 0.5, 0.36, 0.04, 0x222831, 1.0, 1.15, -2.8);
-  cyl(scene, 0.07, 0.07, 0.2, 0x9aa8b5, 1.9, 1.05, -2.7);
-  cyl(scene, 1.25, 1.25, 0.02, 0xb9a48a, 0.4, 0.01, 0.5, 32);
-  cyl(scene, 1.0, 1.0, 0.02, 0xd9c9ae, 0.4, 0.024, 0.5, 32);
-  windowPane(-0.8, 1.55, 2.98, Math.PI);
-  box(scene, 0.03, 0.9, 0.7, 0x24344d, -3.48, 1.6, 0.8); box(scene, 0.035, 0.74, 0.54, 0xe9c46a, -3.47, 1.6, 0.8);
+  for (let i = 0; i < 3; i++) for (const s of [-0.42, 0.42]) { noCast(box(scene, 0.72, 0.24, 0.02, 0x7d5a3c, 1.4 + s, 0.2 + i * 0.29, -2.44)); sph(scene, 0.02, 0xd9b34a, 1.4 + s, 0.2 + i * 0.29, -2.425); }
+  noCast(cyl(scene, 0.44, 0.44, 0.03, 0xd9b34a, 1.4, 1.78, -2.975, 40)).rotation.x = Math.PI / 2;
+  noCast(cyl(scene, 0.4, 0.4, 0.032, 0xcfe1ea, 1.4, 1.78, -2.972, 40, { emissive: 0x4a6170 })).rotation.x = Math.PI / 2;
+  box(scene, 0.34, 0.02, 0.22, 0xd9b34a, 1.0, 0.96, -2.68); cyl(scene, 0.03, 0.03, 0.1, 0x3d5a80, 0.93, 1.02, -2.68, 10); cyl(scene, 0.025, 0.025, 0.07, 0xb8573a, 1.05, 1.005, -2.7, 10);
+  cyl(scene, 0.07, 0.055, 0.1, 0xf4f1ea, 1.95, 1.0, -2.72, 12); sph(scene, 0.1, 0x3c9460, 1.95, 1.13, -2.72);
+  { const f = box(scene, 0.16, 0.2, 0.02, 0x1f1f22, 1.5, 1.05, -2.78); f.rotation.x = -0.18; }
+  // rug
+  box(scene, 2.7, 0.02, 1.9, rugTex('#d8cdb8', '#2f4a5a', '#b8573a'), 0.2, 0.012, 0.4);
+  // window with curtains
+  windowPane(-0.8, 1.55, 2.98, Math.PI); curtains(-0.8, 1.55, 2.98, Math.PI, 1.6, 1.2);
+  // wall art and a pennant on the -x wall
+  noCast(box(scene, 0.03, 0.9, 0.7, 0x24344d, -3.48, 1.6, 0.8)); noCast(box(scene, 0.035, 0.74, 0.54, 0xe9c46a, -3.47, 1.6, 0.8));
+  plane(scene, 0.95, 0.42, tex(380, 168, (c, W, H) => { c.fillStyle = '#9b1c2c'; c.beginPath(); c.moveTo(0, 0); c.lineTo(W, H / 2); c.lineTo(0, H); c.fill(); c.fillStyle = '#f6efe0'; c.fillRect(0, 0, 16, H); c.font = 'bold 74px Georgia, serif'; c.textBaseline = 'middle'; c.fillText('LAX', 34, H / 2 + 4); }), -3.485, 2.15, -0.75, Math.PI / 2, false);
   plant(-3.0, 2.5);
-  box(scene, 0.9, 0.04, 0.5, 0x6b4a2f, 2.9, 0.72, -0.9); box(scene, 0.05, 0.72, 0.05, 0x333333, 2.55, 0.36, -1.1);
-  box(scene, 0.05, 0.72, 0.05, 0x333333, 2.55, 0.36, -0.7); col(2.9, -0.9, 0.9, 0.5);
+  // desk along the +x wall: laptop, lamp, mug, chair, and a shelf above
+  box(scene, 0.6, 0.04, 1.3, 0x6b4a2f, 3.18, 0.74, -1.3); col(3.18, -1.3, 0.62, 1.32);
+  for (const [dx, dz] of [[-.26, -.6], [.26, -.6], [-.26, .6], [.26, .6]]) box(scene, 0.045, 0.72, 0.045, 0x2c2018, 3.18 + dx, 0.36, -1.3 + dz);
+  box(scene, 0.5, 0.36, 0.36, 0x7d5a3c, 3.2, 0.54, -1.74); sph(scene, 0.018, 0xd9b34a, 2.945, 0.54, -1.74);
+  box(scene, 0.23, 0.014, 0.33, 0xb9bcc4, 3.12, 0.767, -1.2); { const sc = box(scene, 0.012, 0.22, 0.33, 0xb9bcc4, 3.25, 0.87, -1.2); sc.rotation.z = -0.2; const gl = noCast(box(scene, 0.004, 0.19, 0.3, 0x9fc4ff, 3.241, 0.872, -1.2, { emissive: 0x6f9be8 })); gl.rotation.z = -0.2; }
+  cyl(scene, 0.07, 0.08, 0.02, 0x222222, 3.3, 0.77, -1.82, 14); { const arm = cyl(scene, 0.01, 0.01, 0.42, 0x222222, 3.25, 0.96, -1.8, 6); arm.rotation.z = 0.3; } noCast(cyl(scene, 0.05, 0.1, 0.12, 0x222222, 3.16, 1.15, -1.76, 14, { emissive: 0x554422 }));
+  cyl(scene, 0.04, 0.035, 0.09, 0xf4f1ea, 3.05, 0.805, -0.82, 12); [0x2a9d8f, 0xe9c46a].forEach((c, i) => box(scene, 0.2, 0.03, 0.15, c, 3.28, 0.775 + i * 0.03, -0.85));
+  box(scene, 0.44, 0.05, 0.44, 0x2f4a5a, 2.55, 0.46, -1.25); box(scene, 0.05, 0.5, 0.44, 0x2f4a5a, 2.35, 0.74, -1.25);
+  for (const [dx, dz] of [[-.18, -.18], [.18, -.18], [-.18, .18], [.18, .18]]) box(scene, 0.035, 0.44, 0.035, 0x222222, 2.55 + dx, 0.22, -1.25 + dz);
+  col(2.5, -1.25, 0.5, 0.5);
+  box(scene, 0.22, 0.03, 1.15, 0x6b4a2f, 3.385, 1.6, -1.3);
+  [0xd64545, 0x264653, 0xe9c46a, 0x2a9d8f, 0x6d597a].forEach((c, i) => box(scene, 0.15, 0.2 + (i % 3) * 0.025, 0.045, c, 3.39, 1.72 + (i % 3) * 0.012, -1.78 + i * 0.055));
+  cyl(scene, 0.035, 0.05, 0.03, 0xd9b34a, 3.39, 1.63, -1.05, 12); cyl(scene, 0.012, 0.012, 0.06, 0xd9b34a, 3.39, 1.67, -1.05, 8); cyl(scene, 0.05, 0.025, 0.1, 0xd9b34a, 3.39, 1.75, -1.05, 14);   // a small trophy
+  sph(scene, 0.032, 0xfffb8a, 3.39, 1.647, -0.86);                                       // lacrosse ball
+  // hamper and sneakers by the door
+  cyl(scene, 0.22, 0.19, 0.5, 0xc9a877, 3.1, 0.25, 2.55, 16); col(3.1, 2.55, 0.46, 0.46);
+  for (const dz of [0.34, 0.5]) { box(scene, 0.26, 0.08, 0.1, 0xf4f1ea, 3.22, 0.04, dz); noCast(box(scene, 0.12, 0.02, 0.102, 0x9b1c2c, 3.2, 0.06, dz)); }
 })();
 
 /* ------------------------------------------------------------------ shared wall with the doorway (x = 3.5..3.7) */
 (function sharedWall() {
   const { z0, z1, x } = DOOR, DH = 2.1;
-  const seg = (xc, zA, zB, yA, yB, color) => box(scene, 0.1, yB - yA, zB - zA, color, xc, (yA + yB) / 2, (zA + zB) / 2);
+  const seg = (xc, zA, zB, yA, yB, color) => noCast(box(scene, 0.1, yB - yA, zB - zA, color, xc, (yA + yB) / 2, (zA + zB) / 2));
   // bedroom face
   seg(x - 0.05, -3, z0, 0, 2.8, 0xcbd3cf); seg(x - 0.05, z1, 3, 0, 2.8, 0xcbd3cf); seg(x - 0.05, z0, z1, DH, 2.8, 0xcbd3cf);
   // living-room face
@@ -247,9 +339,9 @@ function tombstone(parent, name, x, y, z, s) {
 (function living() {
   // shell first (13 x 10), then furniture positions are squeezed from the original 16 x 12 layout
   MX = x => x + LIV; MZ = z => z;
-  room(38.5, 0, 13, 10, 3.2, 0x9b7b58, 0xe7e0d3, 0xf5f2ec, 'nx');
+  room(38.5, 0, 13, 10, 3.2, woodFloor(13, 10, '#94704c'), 0xe9e2d5, 0xf5f2ec, 'nx');
   box(scene, 0.03, 0.1, 5.75, 0xf5f1e8, 32.015, 0.05, -2.125); box(scene, 0.03, 0.1, 3.15, 0xf5f1e8, 32.015, 0.05, 3.425);
-  box(scene, 0.02, 3.1, 10, 0x24344d, 44.98, 1.65, 0);            // accent wall behind the TV
+  noCast(box(scene, 0.02, 3.01, 10, 0x24344d, 44.98, 1.605, 0));            // accent wall behind the TV
   MX = x => (x >= 44 ? x - 3 : 32 + (x - 32) * 0.75) + LIV; MZ = z => (Math.abs(z) > 4 ? z - Math.sign(z) : z * 0.75);
   for (const [x, z] of [[36, -2.5], [36, 2.5], [44, -2.5], [44, 2.5]]) {
     lamp(x, 2.1, z, 9);
@@ -273,13 +365,7 @@ function tombstone(parent, name, x, y, z, s) {
   box(tv, 0.34, 0.09, 0.3, 0x15171c, -0.02, 0.545, 0.7); box(tv, 0.02, 0.02, 0.04, 0xffffff, -0.19, 0.55, 0.78, { emissive: 0xffffff });
   box(tv, 0.1, 0.5, 0.14, 0x15171c, 0.05, 0.75, -1.05);
   interact(tv, 'Play games', openGames);
-  const c1 = 0x4f6d7a;
-  box(scene, 0.95, 0.42, 2.6, c1, 44.2, 0.21, 0); box(scene, 0.28, 0.95, 2.6, c1, 43.72, 0.475, 0);
-  box(scene, 0.95, 0.62, 0.26, c1, 44.2, 0.31, -1.37); box(scene, 0.95, 0.62, 0.26, c1, 44.2, 0.31, 1.37);
-  box(scene, 0.8, 0.14, 1.12, 0x5c7d8b, 44.28, 0.49, -0.6); box(scene, 0.8, 0.14, 1.12, 0x5c7d8b, 44.28, 0.49, 0.6);
-  box(scene, 0.16, 0.36, 0.4, 0xe9c46a, 43.95, 0.72, -0.8);
-  col(44.1, 0, 1.1, 2.9);
-  box(scene, 3.6, 0.02, 3.8, 0x8d5b4c, 45.6, 0.01, 0); box(scene, 3.2, 0.02, 3.4, 0xb9836f, 45.6, 0.024, 0);
+  box(scene, 3.7, 0.02, 4.0, rugTex('#c9b79a', '#24344d', '#a5503a'), 45.6, 0.012, 0);
   box(scene, 0.6, 0.06, 1.3, 0x6b4a2f, 45.75, 0.4, 0); col(45.75, 0, 0.6, 1.3);
   for (const [dx, dz] of [[-.25, -.58], [.25, -.58], [-.25, .58], [.25, .58]]) box(scene, 0.05, 0.38, 0.05, 0x333333, 45.75 + dx, 0.19, dz);
   for (const dz of [-0.3, 0.25]) { box(scene, 0.11, 0.035, 0.17, 0x1a1c22, 45.75, 0.448, dz); sph(scene, 0.015, 0xdddddd, 45.72, 0.47, dz + 0.04); }
@@ -461,6 +547,51 @@ function tombstone(parent, name, x, y, z, s) {
   box(head, 0.14, 0.05, 0.12, 0x6a4a32, -0.02, 0.325, 0.0).rotation.z = 0.12;
   buddy.head = head; buddy.root = guy;
   interact(guy, 'Say hi to Pat: visit patricksliz.com', () => openLink('https://patricksliz.com/'));
+
+
+  /* --- detail pass, in real room coordinates (x 32..45, z -5..5) --- */
+  MX = x => x + LIV; MZ = z => z;
+  for (const x of [34.6, 38.5, 42.4]) noCast(box(scene, 0.16, 0.14, 10, 0x5d4632, x, 3.13, 0));             // ceiling beams
+  // couch, facing the TV
+  { const g = group(41.15, 0, 0), cc = 0x4f6d7a, cu = 0x5f8090;
+    box(g, 0.95, 0.3, 2.5, cc, 0, 0.27, 0); box(g, 0.2, 0.82, 2.5, cc, -0.5, 0.53, 0);
+    for (const s of [-1, 1]) { box(g, 1.15, 0.6, 0.2, cc, -0.1, 0.42, s * 1.35); box(g, 0.78, 0.16, 1.2, cu, 0.06, 0.5, s * 0.62); const bk = box(g, 0.2, 0.5, 1.18, cu, -0.33, 0.78, s * 0.62); bk.rotation.z = 0.12;
+      for (const dx of [-0.42, 0.42]) box(g, 0.06, 0.12, 0.06, 0x2c2018, dx - 0.05, 0.06, s * 1.3); }
+    const p1 = box(g, 0.14, 0.36, 0.38, 0xe9c46a, -0.16, 0.76, -0.95); p1.rotation.z = 0.25; const p2 = box(g, 0.14, 0.34, 0.36, 0xb8573a, -0.14, 0.75, 0.98); p2.rotation.z = 0.25; p2.rotation.y = 0.15;
+    const p3 = box(g, 0.13, 0.3, 0.32, 0xf4f1ea, -0.1, 0.72, 0.62); p3.rotation.z = 0.3;
+    box(g, 0.5, 0.04, 0.24, 0xd9cdb8, 0.05, 0.74, 1.35); box(g, 0.04, 0.34, 0.24, 0xd9cdb8, 0.3, 0.58, 1.46);                                  // throw over the arm
+  }
+  col(41.1, 0, 1.2, 2.95);
+  // coffee table things
+  [0x264653, 0xe9c46a].forEach((c, i) => box(scene, 0.22, 0.03, 0.3, c, 42.72, 0.445 + i * 0.03, -0.42));
+  cyl(scene, 0.04, 0.035, 0.09, 0xf4f1ea, 42.9, 0.475, 0.45, 12); cyl(scene, 0.06, 0.05, 0.07, 0xb5653a, 42.62, 0.465, 0.5, 12); sph(scene, 0.07, 0x3c9460, 42.62, 0.55, 0.5);
+  box(scene, 0.05, 0.02, 0.16, 0x15171c, 42.88, 0.44, -0.05);
+  // TV wall: glow behind the screen, soundbar, floating shelves
+  noCast(box(scene, 0.02, 1.64, 2.84, 0x8a7cff, 44.93, 1.75, 0, { emissive: 0x6a5cff, emissiveIntensity: 1.4 })); lamp(44.6, 1.75, 0, 2.2, 0x8a7cff);
+  box(scene, 0.1, 0.07, 1.1, 0x15171c, 44.42, 0.535, -0.35);
+  for (const s of [-1, 1]) for (const y of [1.35, 1.95]) {
+    box(scene, 0.24, 0.035, 0.95, 0x8a6a4a, 44.85, y, s * 2.55);
+    if (y < 1.5) { [0xd64545, 0x2a9d8f, 0xe9c46a, 0x264653].forEach((c, i) => box(scene, 0.16, 0.2 + (i % 2) * 0.03, 0.045, c, 44.86, y + 0.12 + (i % 2) * 0.015, s * 2.55 - 0.3 + i * 0.055)); cyl(scene, 0.05, 0.04, 0.08, 0xf4f1ea, 44.84, y + 0.06, s * 2.55 + 0.25, 12); sph(scene, 0.07, 0x3c9460, 44.84, y + 0.15, s * 2.55 + 0.25); }
+    else { box(scene, 0.14, 0.2, 0.14, 0x15171c, 44.86, y + 0.12, s * 2.55 - 0.25); noCast(cyl(scene, 0.045, 0.045, 0.01, 0x3a3e46, 44.788, y + 0.12, s * 2.55 - 0.25, 14)).rotation.z = Math.PI / 2; const f = box(scene, 0.02, 0.2, 0.16, 0xd9b34a, 44.88, y + 0.12, s * 2.55 + 0.2); f.rotation.z = 0.12; cyl(scene, 0.03, 0.03, 0.09, 0xf1e3c6, 44.84, y + 0.063, s * 2.55 + 0.02, 10); }
+  }
+  // console table by the door: record player, lamp, round mirror
+  box(scene, 0.36, 0.04, 1.5, 0x6b4a2f, 32.32, 0.82, -1.6); col(32.32, -1.6, 0.42, 1.55);
+  for (const [dx, dz] of [[-.14, -.7], [.14, -.7], [-.14, .7], [.14, .7]]) box(scene, 0.04, 0.8, 0.04, 0x2c2018, 32.32 + dx, 0.4, -1.6 + dz);
+  box(scene, 0.34, 0.03, 1.46, 0x7d5a3c, 32.32, 0.3, -1.6); box(scene, 0.3, 0.3, 0.34, 0xc9a877, 32.32, 0.465, -2.05);
+  for (let i = 0; i < 7; i++) noCast(box(scene, 0.28, 0.27, 0.012, [0x1d3557, 0xe76f51, 0x2a9d8f, 0xe9c46a, 0x6d597a, 0xd64545, 0x264653][i], 32.32, 0.5, -2.17 + i * 0.04));
+  box(scene, 0.32, 0.07, 0.42, 0x2c2018, 32.32, 0.875, -1.85); noCast(cyl(scene, 0.14, 0.14, 0.012, 0x111111, 32.32, 0.916, -1.89, 28)); noCast(cyl(scene, 0.045, 0.045, 0.014, 0xd64545, 32.32, 0.917, -1.89, 16));
+  { const arm = box(scene, 0.012, 0.012, 0.2, 0xc9ccd2, 32.43, 0.93, -1.76); arm.rotation.y = 0.5; }
+  cyl(scene, 0.07, 0.09, 0.26, 0x3d5a80, 32.3, 0.97, -1.05, 14); noCast(cyl(scene, 0.11, 0.17, 0.22, 0xfff0cc, 32.3, 1.2, -1.05, 18, { emissive: 0xffd68a, emissiveIntensity: 0.85 })); lamp(32.6, 1.25, -1.05, 3.5);
+  noCast(cyl(scene, 0.46, 0.46, 0.03, 0x2c2018, 32.02, 1.78, -1.6, 40)).rotation.z = Math.PI / 2; noCast(cyl(scene, 0.42, 0.42, 0.032, 0xcfe1ea, 32.024, 1.78, -1.6, 40, { emissive: 0x4a6170 })).rotation.z = Math.PI / 2;
+  // tall plant between the door and the camera
+  cyl(scene, 0.2, 0.16, 0.4, 0xf4f1ea, 32.5, 0.2, 2.75, 16); cyl(scene, 0.03, 0.04, 1.1, 0x5d4632, 32.5, 0.95, 2.75, 8); col(32.5, 2.75, 0.46, 0.46);
+  for (let i = 0; i < 9; i++) { const a = i * 2.4, r = 0.16 + (i % 3) * 0.1, lf = sph(scene, 0.17, i % 2 ? 0x2f7d4f : 0x3c9460, 32.5 + Math.cos(a) * r, 1.25 + i * 0.075, 2.75 + Math.sin(a) * r); lf.scale.set(1, 0.45, 1.3); lf.rotation.y = a; }
+  // window dressing, a wall clock, and more art
+  curtains(39.125, 1.75, -4.98, 0, 2.6, 1.5);
+  noCast(cyl(scene, 0.24, 0.24, 0.03, 0x2c2018, 33.95, 2.3, -4.975, 32)).rotation.x = Math.PI / 2;
+  plane(scene, 0.42, 0.42, tex(128, 128, (c, W) => { c.fillStyle = '#f6f1e6'; c.beginPath(); c.arc(64, 64, 62, 0, 7); c.fill(); c.strokeStyle = '#22252b'; c.lineCap = 'round'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.lineWidth = i % 3 ? 2 : 5; c.beginPath(); c.moveTo(64 + Math.sin(a) * 50, 64 - Math.cos(a) * 50); c.lineTo(64 + Math.sin(a) * 57, 64 - Math.cos(a) * 57); c.stroke(); } c.lineWidth = 5; c.beginPath(); c.moveTo(64, 64); c.lineTo(42, 44); c.stroke(); c.lineWidth = 3; c.beginPath(); c.moveTo(64, 64); c.lineTo(92, 34); c.stroke(); c.fillStyle = '#9b1c2c'; c.beginPath(); c.arc(64, 64, 5, 0, 7); c.fill(); }), 33.95, 2.3, -4.957, 0, false);
+  frameArt(scene, 37.35, 2.15, 4.975, Math.PI, 0.5, 0.4, 4); frameArt(scene, 37.35, 1.62, 4.975, Math.PI, 0.5, 0.4, 7); frameArt(scene, 35.9, 2.1, 4.975, Math.PI, 0.62, 0.46, 5, 0xd9b34a);
+  frameArt(scene, 32.025, 2.0, -3.3, Math.PI / 2, 0.5, 0.66, 8, 0xd9b34a);
 
   MX = x => x; MZ = z => z;
 })();
