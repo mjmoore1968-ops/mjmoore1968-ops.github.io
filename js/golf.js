@@ -300,7 +300,7 @@ export function createGolf(THREE, ctx) {
 
   /* ---------------------------------------------------------------- inside Lucky's (a sealed room under the lawn) */
   const barG = new THREE.Group(); barG.position.set(BAR.x, BAR.y, BAR.z); scene.add(barG);
-  const tender = new THREE.Group(), tArm = new THREE.Group(), tHead = new THREE.Group(); let poolTable = null, tRag = null, tCue = null;
+  const tender = new THREE.Group(), tArm = new THREE.Group(), tHead = new THREE.Group(); let poolTable = null, poolLamp = null, tRag = null, tCue = null;
   { const HW = BAR.hw, HD = BAR.hd, CE = 3.8, wood = 0x3b2414, dark = 0x2e1d12, green = 0x14432a, wall = 0x27463a, brass = 0xc9a24a;
     const floorT = canvasTex(512, 512, (c, W, H) => { const r = mulberry(5); for (let y = 0; y < 8; y++) for (let x = -1; x < 3; x++) { const v = 70 + r() * 34; c.fillStyle = `rgb(${v + 38 | 0},${v | 0},${v * 0.55 | 0})`; c.fillRect(x * 256 + (y % 2) * 128, y * 64, 254, 62); } c.fillStyle = 'rgba(0,0,0,.35)'; for (let y = 0; y < 8; y++) c.fillRect(0, y * 64 + 62, W, 2); });
     floorT.wrapS = floorT.wrapT = THREE.RepeatWrapping; floorT.repeat.set(4, 3);
@@ -340,7 +340,8 @@ export function createGolf(THREE, ctx) {
       bx(P, 2.7, 0.28, 1.5, wood, 0, 0.78, 0); bx(P, 2.36, 0.03, 1.16, 0x1f7a45, 0, 0.925, 0);
       for (const k of [-1, 1]) { bx(P, 2.7, 0.07, 0.17, 0x4a2f1c, 0, 0.955, k * 0.665); bx(P, 0.17, 0.07, 1.5, 0x4a2f1c, k * 1.265, 0.955, 0); for (const j of [-1, 1]) bx(P, 0.16, 0.66, 0.16, dark, k * 1.15, 0.33, j * 0.55); }
       poolTable = P;
-      cyl(P, 0.012, 0.012, 1.1, 0x222222, 0, CE - 0.55, 0, 6); bx(P, 1.5, 0.2, 0.6, green, 0, 2.6, 0); bx(P, 1.3, 0.03, 0.44, glow(0xffe9b8), 0, 2.49, 0); }
+      poolLamp = new THREE.Group(); P.add(poolLamp);                                 // hidden while you play, so the overhead camera can see the cloth
+      cyl(poolLamp, 0.012, 0.012, 1.1, 0x222222, 0, CE - 0.55, 0, 6); bx(poolLamp, 1.5, 0.2, 0.6, green, 0, 2.6, 0); bx(poolLamp, 1.3, 0.03, 0.44, glow(0xffe9b8), 0, 2.49, 0); }
     // high-top tables
     for (const [x, z] of [[3.4, 3.4], [6.0, 1.0]]) { cyl(barG, 0.46, 0.46, 0.05, 0x7a4a26, x, 1.06, z, 20); cyl(barG, 0.045, 0.045, 1.04, 0x555555, x, 0.52, z, 8); cyl(barG, 0.3, 0.32, 0.04, 0x555555, x, 0.02, z, 16);
       for (const k of [-1, 1]) { cyl(barG, 0.19, 0.19, 0.07, 0x7a1f1f, x + k * 0.8, 0.76, z + 0.15 * k, 14); cyl(barG, 0.028, 0.028, 0.74, 0x888888, x + k * 0.8, 0.38, z + 0.15 * k, 8); cyl(barG, 0.18, 0.2, 0.03, 0x555555, x + k * 0.8, 0.015, z + 0.15 * k, 14); }
@@ -355,54 +356,41 @@ export function createGolf(THREE, ctx) {
     bx(barG, 1.5, 2.6, 0.12, green, 0, 1.3, HD - 0.05); bx(barG, 1.15, 2.3, 0.1, 0x5b3a22, 0, 1.17, HD - 0.1); bx(barG, 0.05, 0.5, 0.06, brass, -0.42, 1.15, HD - 0.17);
     const ex = add(new THREE.PlaneGeometry(0.62, 0.24), new THREE.MeshBasicMaterial({ map: canvasTex(128, 48, (c, W, H) => { c.fillStyle = '#b8201a'; c.fillRect(0, 0, W, H); c.fillStyle = '#fff'; c.font = 'bold 34px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('EXIT', W / 2, H / 2 + 2); }) }), 0, 2.85, HD - 0.12, barG); ex.rotation.y = Math.PI;
     for (const k of [-1, 1]) { bx(barG, 4.2, 2.1, 0.06, glow(0xbfe0f7), k * 4.6, 1.95, HD - 0.03); for (const y of [0.86, 3.04]) bx(barG, 4.5, 0.14, 0.14, green, k * 4.6, y, HD - 0.08); for (const x of [-2.18, 0, 2.18]) bx(barG, 0.12, 2.2, 0.14, green, k * 4.6 + x, 1.95, HD - 0.08); }
-    // the bartender
-    const skin = L(0xf3c9a5), skin2 = L(0xe6b48e), topM = L(0x17191d), jean = L(0x33507f), hairA = L(0xf6dc7c), hairB = L(0xe7c655), gold = L(0xe2b84a), lipM = L(0xc9475c), white = L(0xffffff);
-    const tor = (parent, r, t, c, x, y, z) => add(new THREE.TorusGeometry(r, t, 6, 20), c, x, y, z, parent);
-    tender.rotation.order = 'YXZ'; tender.position.set(-1.2, 0, -3.2); tender.scale.setScalar(0.97); barG.add(tender);
-    for (const k of [-1, 1]) {                                                                                       // legs and boots
-      cyl(tender, 0.088, 0.068, 0.44, jean, k * 0.095, 0.7, 0, 10); cyl(tender, 0.066, 0.05, 0.42, jean, k * 0.095, 0.29, 0, 10);
-      bx(tender, 0.1, 0.1, 0.25, 0x3a2416, k * 0.095, 0.05, 0.035); bx(tender, 0.1, 0.03, 0.08, 0x24160d, k * 0.095, 0.015, -0.06);
-    }
-    sph(tender, 0.19, jean, 0, 0.94, -0.01).scale.set(1, 0.6, 0.82);                                                 // hips
-    cyl(tender, 0.158, 0.172, 0.045, 0x5b3a22, 0, 1.035, 0, 16).scale.z = 0.82; bx(tender, 0.05, 0.04, 0.02, gold, 0, 1.035, 0.142);   // belt and buckle
-    bx(tender, 0.3, 0.3, 0.018, 0x14432a, 0, 0.86, 0.15); bx(tender, 0.16, 0.1, 0.01, 0x0f3320, 0, 0.83, 0.162); bx(tender, 0.32, 0.03, 0.02, 0x0f3320, 0, 1.0, 0.151);   // short apron
-    cyl(tender, 0.15, 0.158, 0.14, topM, 0, 1.12, 0, 16).scale.z = 0.8; cyl(tender, 0.186, 0.15, 0.24, topM, 0, 1.3, 0, 16).scale.z = 0.8;    // waist, ribs
-    cyl(tender, 0.16, 0.186, 0.07, skin, 0, 1.455, 0, 16).scale.z = 0.8;
-    for (const k of [-1, 1]) { sph(tender, 0.1, topM, k * 0.088, 1.335, 0.1).scale.set(1, 0.95, 0.95); sph(tender, 0.062, skin, k * 0.215, 1.45, 0); }
-    cyl(tender, 0.043, 0.05, 0.12, skin, 0, 1.55, 0, 10);
-    tor(tender, 0.056, 0.003, gold, 0, 1.497, 0.028).rotation.x = Math.PI / 2 - 0.42; sph(tender, 0.011, 0x2fae5c, 0, 1.47, 0.082);                 // necklace with a clover-green stone
-    // head: face, then a lot of hair
-    tHead.position.set(0, 1.715, 0); tender.add(tHead);
-    sph(tHead, 0.112, skin, 0, 0, 0).scale.set(0.93, 1.1, 1);
-    cyl(tHead, 0.005, 0.013, 0.04, skin, 0, -0.01, 0.112, 8).rotation.x = -0.42; sph(tHead, 0.012, skin, 0, -0.027, 0.113).scale.set(1.15, 0.7, 0.7);
+    // the bartender: built in the same blocky style as Pat. Long blonde hair, black top, jeans, a green Lucky's apron.
+    const skin = L(0xf0c8a6), topM = L(0x17191d), jean = L(0x3d5f93), hairM = L(0xf3d667), hairD = L(0xe2bf4c);
+    tender.rotation.order = 'YXZ'; tender.position.set(-1.2, 0, -3.2); barG.add(tender);
     for (const k of [-1, 1]) {
-      sph(tHead, 0.021, white, k * 0.043, 0.018, 0.093).scale.set(1.15, 0.78, 0.5); sph(tHead, 0.0115, 0x3a86cc, k * 0.043, 0.017, 0.1015).scale.z = 0.5; sph(tHead, 0.006, 0x111111, k * 0.043, 0.017, 0.1055).scale.z = 0.5;
-      sph(tHead, 0.003, glow(0xffffff), k * 0.043 + 0.004, 0.022, 0.108);                                                                // a catchlight
-      const lash = bx(tHead, 0.04, 0.0045, 0.008, 0x3a2a1c, k * 0.0435, 0.0335, 0.1015); lash.rotation.z = -k * 0.03;
-      const brow = bx(tHead, 0.048, 0.007, 0.012, 0xa9853a, k * 0.045, 0.064, 0.1); brow.rotation.z = -k * 0.03;
-      sph(tHead, 0.024, 0xf2a898, k * 0.066, -0.024, 0.082).scale.set(1, 0.7, 0.35);                                                      // blush
-      sph(tHead, 0.02, skin, k * 0.103, 0.0, 0.0).scale.set(0.5, 1, 0.8); tor(tHead, 0.017, 0.0035, gold, k * 0.108, -0.04, 0.0).rotation.y = Math.PI / 2;   // ear and hoop
+      bx(tender, 0.14, 0.8, 0.16, jean, k * 0.09, 0.47, 0); bx(tender, 0.145, 0.04, 0.165, 0x4a6ea6, k * 0.09, 0.09, 0);        // legs, cuffed hems
+      bx(tender, 0.14, 0.07, 0.26, 0x6b4a2f, k * 0.09, 0.035, 0.04);                                                             // boots
     }
-    bx(tHead, 0.042, 0.009, 0.014, lipM, 0, -0.054, 0.1035); sph(tHead, 0.016, lipM, 0, -0.063, 0.099).scale.set(1.25, 0.45, 0.55);                                                          // the corners of a smile
-    const cap = add(new THREE.SphereGeometry(0.128, 18, 12, 0, 6.2832, 0, Math.PI * 0.56), hairA, 0, 0.012, -0.012, tHead); cap.rotation.x = -0.42;
-    sph(tHead, 0.13, hairA, 0, -0.01, -0.05).scale.set(1.03, 1.08, 0.9);
-    bx(tHead, 0.25, 0.5, 0.07, hairB, 0, -0.24, -0.1);
-    for (let i = -3; i <= 3; i++) cyl(tHead, 0.03, 0.02, 0.5 + (i % 2 ? 0.06 : 0), i % 2 ? hairA : hairB, i * 0.037, -0.27, -0.125 + Math.abs(i) * 0.012, 8);   // long waves down her back
+    bx(tender, 0.35, 0.16, 0.2, jean, 0, 0.93, 0); bx(tender, 0.36, 0.04, 0.205, 0x3a2416, 0, 1.02, 0); bx(tender, 0.05, 0.045, 0.02, 0xd9b34a, 0, 1.02, 0.105);   // hips, belt, buckle
+    bx(tender, 0.3, 0.3, 0.02, 0x14432a, 0, 0.86, 0.112); bx(tender, 0.16, 0.1, 0.012, 0x0f3320, 0, 0.82, 0.125); bx(tender, 0.37, 0.03, 0.21, 0x0f3320, 0, 0.985, 0);   // apron, pocket, ties
+    bx(tender, 0.29, 0.2, 0.17, topM, 0, 1.13, 0); bx(tender, 0.36, 0.24, 0.2, topM, 0, 1.35, 0);                               // waist, chest
+    bx(tender, 0.31, 0.15, 0.1, topM, 0, 1.335, 0.115);                                                                          // bust
+    bx(tender, 0.2, 0.07, 0.012, skin, 0, 1.44, 0.1); bx(tender, 0.3, 0.03, 0.2, skin, 0, 1.485, 0);                             // scoop neckline, shoulders
+    cyl(tender, 0.05, 0.055, 0.1, skin, 0, 1.54, 0, 12);
+    bx(tender, 0.09, 0.012, 0.012, 0xd9b34a, 0, 1.475, 0.108); bx(tender, 0.024, 0.024, 0.012, 0x2fae5c, 0, 1.455, 0.11);        // necklace with a green stone
+    tHead.position.set(0, 1.58, 0); tender.add(tHead);
+    bx(tHead, 0.2, 0.25, 0.21, skin, 0, 0.125, 0); bx(tHead, 0.17, 0.05, 0.19, skin, 0, -0.005, 0);                             // face, jaw
     for (const k of [-1, 1]) {
-      cyl(tHead, 0.036, 0.024, 0.5, hairA, k * 0.128, -0.22, -0.03, 8).rotation.z = k * 0.07; cyl(tHead, 0.022, 0.015, 0.42, hairB, k * 0.13, -0.2, 0.02, 8).rotation.set(0.1, 0, k * 0.12);
-      sph(tHead, 0.028, hairA, k * 0.15, -0.46, -0.01).scale.set(1, 1.3, 1);                                                             // curled ends
+      bx(tHead, 0.036, 0.03, 0.012, 0xffffff, k * 0.05, 0.152, 0.106); bx(tHead, 0.02, 0.026, 0.014, 0x2f7fc4, k * 0.05, 0.152, 0.108); bx(tHead, 0.009, 0.012, 0.016, 0x101418, k * 0.05, 0.152, 0.108);   // eyes
+      bx(tHead, 0.04, 0.005, 0.013, 0x3a2a1c, k * 0.05, 0.1695, 0.108);                                                          // lashes
+      bx(tHead, 0.05, 0.009, 0.014, 0xc9a54a, k * 0.05, 0.2, 0.108).rotation.z = -k * 0.05;                                    // brows
+      bx(tHead, 0.034, 0.02, 0.01, 0xf2a898, k * 0.07, 0.092, 0.106);                                                              // blush
+      bx(tHead, 0.02, 0.03, 0.02, 0xd9b34a, k * 0.112, 0.075, 0.03);                                                               // earrings
+      bx(tHead, 0.04, 0.5, 0.21, hairM, k * 0.112, 0.055, -0.01); bx(tHead, 0.045, 0.3, 0.04, hairD, k * 0.098, -0.08, 0.1);      // hair down the sides, locks over the shoulders
     }
-    { const b1 = sph(tHead, 0.07, hairA, -0.04, 0.085, 0.07); b1.scale.set(1.35, 0.5, 0.62); b1.rotation.z = 0.38; const b2 = sph(tHead, 0.06, hairB, 0.062, 0.075, 0.066); b2.scale.set(1, 0.5, 0.62); b2.rotation.z = -0.55; }   // side-swept fringe
-    // arms: one works the bar, one sits on her hip
-    tArm.position.set(-0.215, 1.45, 0); tArm.rotation.x = -1.1; tender.add(tArm);
-    cyl(tArm, 0.04, 0.035, 0.28, skin, 0, -0.14, 0, 10); sph(tArm, 0.036, skin, 0, -0.28, 0); cyl(tArm, 0.034, 0.027, 0.27, skin, 0, -0.415, 0, 10);
-    sph(tArm, 0.04, skin, 0, -0.575, 0).scale.set(1, 1.2, 0.65); sph(tArm, 0.014, skin, 0.034, -0.56, 0.01); tor(tArm, 0.03, 0.005, gold, 0, -0.52, 0).rotation.x = Math.PI / 2;
-    tRag = bx(tArm, 0.18, 0.03, 0.14, 0xf4f1ea, 0, -0.62, 0);
-    { const up = new THREE.Group(); up.position.set(0.215, 1.45, 0); up.rotation.z = 0.55; tender.add(up);
-      cyl(up, 0.04, 0.035, 0.28, skin, 0, -0.14, 0, 10); sph(up, 0.036, skin, 0, -0.28, 0);
-      const lo = new THREE.Group(); lo.position.set(0, -0.28, 0); lo.rotation.z = -1.5; up.add(lo);
-      cyl(lo, 0.034, 0.027, 0.26, skin, 0, -0.13, 0, 10); sph(lo, 0.04, skin, 0, -0.28, 0).scale.set(1, 1.2, 0.65); tor(lo, 0.029, 0.004, gold, 0, -0.22, 0).rotation.x = Math.PI / 2; }
-    tCue = cyl(tender, 0.006, 0.013, 1.45, 0xd8b98a, -0.34, 0.74, 0.16, 8); tCue.visible = false;                                         // her cue, when she is waiting at the pool table
+    bx(tHead, 0.026, 0.045, 0.028, 0xe6b894, 0, 0.11, 0.115);                                                                    // nose
+    bx(tHead, 0.07, 0.016, 0.012, 0xc9475c, 0, 0.055, 0.107); for (const k of [-1, 1]) bx(tHead, 0.014, 0.014, 0.012, 0xc9475c, k * 0.04, 0.066, 0.107);   // a smile
+    bx(tHead, 0.23, 0.07, 0.24, hairM, 0, 0.275, 0); bx(tHead, 0.24, 0.62, 0.05, hairM, 0, 0.0, -0.118); bx(tHead, 0.2, 0.5, 0.03, hairD, 0, -0.06, -0.147);   // top, long back
+    const fr = bx(tHead, 0.15, 0.06, 0.05, hairM, -0.035, 0.24, 0.105); fr.rotation.z = 0.28; const fr2 = bx(tHead, 0.08, 0.05, 0.05, hairD, 0.068, 0.238, 0.104); fr2.rotation.z = -0.4;   // side-swept fringe
+    // arms: one wipes the bar, one hangs by her side
+    tArm.position.set(-0.225, 1.45, 0); tArm.rotation.x = -1.1; tender.add(tArm);
+    bx(tArm, 0.1, 0.1, 0.11, topM, 0, -0.03, 0); bx(tArm, 0.085, 0.5, 0.09, skin, 0, -0.32, 0); sph(tArm, 0.05, skin, 0, -0.6, 0); bx(tArm, 0.09, 0.025, 0.095, 0xd9b34a, 0, -0.52, 0);
+    tRag = bx(tArm, 0.18, 0.03, 0.14, 0xf4f1ea, 0, -0.655, 0);
+    { const ar = new THREE.Group(); ar.position.set(0.225, 1.45, 0); ar.rotation.z = 0.1; tender.add(ar);
+      bx(ar, 0.1, 0.1, 0.11, topM, 0, -0.03, 0); bx(ar, 0.085, 0.5, 0.09, skin, 0, -0.32, 0); sph(ar, 0.05, skin, 0, -0.6, 0); }
+    tCue = cyl(tender, 0.006, 0.013, 1.45, 0xd8b98a, -0.34, 0.74, 0.16, 8); tCue.visible = false;                                // her cue, when she is waiting at the pool table
   }
   const barBlocked = (x, z) => Math.abs(x) > BAR.hw - 0.4 || Math.abs(z) > BAR.hd - 0.4 || (x < 4.75 && z < -0.9) || z < -3.5
     || (Math.abs(x + 4.3) < 1.75 && Math.abs(z - 2.6) < 1.15) || Math.hypot(x - 3.4, z - 3.4) < 0.8 || Math.hypot(x - 6.0, z - 1.0) < 0.8;
@@ -410,15 +398,15 @@ export function createGolf(THREE, ctx) {
   // the pool game moves her around: x,z in table space, pose 'shoot' | 'watch'
   function poseTender(x, z, ry, pose, snap) {
     tender.position.x = clamp(-4.3 + x, -BAR.hw + 0.45, BAR.hw - 0.45); tender.position.z = clamp(2.6 + z, -BAR.hd + 0.45, BAR.hd - 0.45); if (snap) tender.rotation.y = ry;
-    const sh = pose === 'shoot'; tender.rotation.y += wrap(ry - tender.rotation.y) * 0.25; tender.rotation.x += ((sh ? 0.34 : 0) - tender.rotation.x) * 0.2;
+    const sh = pose === 'shoot'; tender.rotation.y += wrap(ry - tender.rotation.y) * 0.25; tender.rotation.x += ((sh ? 0.12 : 0) - tender.rotation.x) * 0.2;
     tArm.rotation.x += ((sh ? -1.25 : -0.12) - tArm.rotation.x) * 0.2; tArm.rotation.z = sh ? 0.2 : 0; tHead.rotation.y = 0; tHead.rotation.x = sh ? -0.25 : 0;
     tRag.visible = false; tCue.visible = !sh;
   }
   function tenderHome() { tender.position.set(TENDER_HOME[0], 0, TENDER_HOME[1]); tender.rotation.set(0, 0, 0); tArm.rotation.set(-1.1, 0, 0); tHead.rotation.set(0, 0, 0); tRag.visible = true; tCue.visible = false; }
-  const pool = createPool(THREE, { group: poolTable, top: 0.94, origin: { x: BAR.x - 4.3, y: BAR.y, z: BAR.z + 2.6 }, camera, touch: ctx.touch, tender: poseTender, line: t => { S.line = t; S.lineT = 3.6; },
+  const pool = createPool(THREE, { group: poolTable, lamp: poolLamp, top: 0.94, origin: { x: BAR.x - 4.3, y: BAR.y, z: BAR.z + 2.6 }, camera, touch: ctx.touch, tender: poseTender, line: t => { S.line = t; S.lineT = 3.6; },
     bounds: { x0: -BAR.hw + 0.25 + 4.3, x1: BAR.hw - 0.25 + 4.3, z0: -BAR.hd + 0.25 - 2.6, z1: BAR.hd - 0.25 - 2.6 } });
   function enterPool() { ctx.fade?.(); S.state = 'pool'; S.lineT = 0; pool.start(); }
-  function leavePool() { ctx.fade?.(); pool.stop(); tenderHome(); S.state = 'bar'; S.bx = -2.25; S.bz = 2.6; S.yaw = Math.PI / 2; S.pitch = -0.15; S.lineT = 0; }
+  function leavePool() { ctx.fade?.(); pool.stop(); camera.fov = 68; camera.updateProjectionMatrix(); tenderHome(); S.state = 'bar'; S.bx = -2.25; S.bz = 2.6; S.yaw = Math.PI / 2; S.pitch = -0.15; S.lineT = 0; }
   function updatePool(dt, s) {
     let html = pool.update(dt, s); S.lineT -= dt; tender.position.y = Math.sin(S.t * 1.7) * 0.004;
     if (S.lineT > 0) html += `<div class="g-prompt" style="top:27%">Bartender: ${S.line}</div>`;
@@ -427,7 +415,7 @@ export function createGolf(THREE, ctx) {
   const LINES = ['“First one’s on the house.”', '“Cold one, coming up.”', '“How did the Volcano treat you?”', '“Same again?”', '“Nobody drives the cart after this one.”', '“They say it brings luck on the Island hole.”', '“You live at number 7, right?”'];
   function setBar(on) { hemi.intensity = on ? 0.42 : 1.7; sun.intensity = on ? 0 : 1.9; }
   function enterBar() { ctx.fade?.(); setBar(true); S.state = 'bar'; S.bx = 0; S.bz = BAR.hd - 1.3; S.yaw = 0; S.pitch = 0; S.lineT = 0; mapEl.classList.add('hidden'); }
-  function leaveBar() { ctx.fade?.(); setBar(false); S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; S.yaw = Math.PI; S.pitch = 0; mapEl.classList.remove('hidden'); }
+  function leaveBar() { ctx.fade?.(); setBar(false); S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; S.yaw = Math.PI; S.pitch = 0; }
   function orderBeer() { S.line = LINES[(Math.random() * LINES.length) | 0]; S.lineT = 3.4; ctx.drink?.(); }
   function updateBar(dt, f, s) {
     if (f || s) {
@@ -459,7 +447,7 @@ export function createGolf(THREE, ctx) {
   const wheel = add(new THREE.TorusGeometry(0.16, 0.025, 6, 14), L(0x222222), -0.35, 1.2, -0.55, cartG); wheel.rotation.x = -1.0;
   add(new THREE.CylinderGeometry(0.2, 0.17, 0.95, 10), L(0x9b1c2c), 0.3, 1.45, 1.2, cartG).rotation.x = -0.2;       // golf bag
   for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 5), L(0xc9ccd2), 0.22 + i * 0.08, 2.05, 1.12, cartG);
-  const cart = { x: 9, z: 17, h: Math.PI * 0.9, v: 0, d: Math.PI * 0.9, slip: 0 };      // h: where it points, d: where it is actually going
+  const cart = { x: APT.x + 6.5, z: APT.z + APT.d / 2 + 7.2, h: Math.PI / 2, v: 0, d: Math.PI / 2, slip: 0 };   // parked outside No. 7      // h: where it points, d: where it is actually going
 
   /* ---------------------------------------------------------------- ball, markers, shot preview, trail */
   const ballM = add(new THREE.SphereGeometry(0.12, 14, 10), L(0xffffff, { emissive: 0x666666 }), 0, 0.12, 0);
@@ -507,10 +495,10 @@ export function createGolf(THREE, ctx) {
   const S = {
     state: 'foot',          // foot | cart | address | flight | landed | holed
     phase: 'aim',           // while addressing: aim -> power (held) -> acc (accuracy line) -> swing
-    px: 0, pz: 3, yaw: Math.PI, pitch: -0.02, led: false, hole: 0, strokes: 0, card: [],
+    px: 0, pz: 3, yaw: Math.PI, pitch: -0.02, led: true, golf: false, hole: 0, strokes: 0, card: [],
     ball: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, mode: 'rest', bounced: 0, spin: 0 }, last: [0, 0],
     aim: 0, club: 0, cT: 0, power: 0, accT: 0, swingT: 0, flT: 0, shotAim: 0, shotClub: 0, msg: '', msgT: 0, sub: '', t: 0, endT: 0, shotFrom: [0, 0],
-    prevF: 0, bx: 0, bz: 4.6, turbo: false, drift: false, line: '', lineT: 0, done: false, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
+    prevF: 0, bx: 0, bz: 4.6, turbo: false, drift: false, line: '', lineT: 0, done: true, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
   };
   const hole = () => holes[S.hole];
   const say = (m, sub = '', t = 2.6) => { S.msg = m; S.sub = sub; S.msgT = t; };
@@ -662,18 +650,33 @@ export function createGolf(THREE, ctx) {
     const k = S.prompt.k;
     if (k === 'cart') {
       S.state = 'cart';
-      if (!S.led) {                                          // first ride: straight to the first tee
-        S.led = true; const h = holes[0]; cart.h = Math.atan2(h.dir0[0], h.dir0[1]);
-        cart.x = h.tee[0] - h.dir0[1] * 5 - h.dir0[0] * 7; cart.z = h.tee[1] + h.dir0[0] * 5 - h.dir0[1] * 7; cart.v = 0;
-        ctx.fade?.(); say('Hole 1', `Par ${h.par} · ${h.len} m. Hop out with E and play your tee shot.`, 4);
-      }
     } else if (k === 'ball') { standBy(); address(); }
     else if (k === 'next') { if (!fromClick) goNext(); }
-    else if (k === 'club') ctx.toast?.('Members only. The course is all yours, though.');
+    else if (k === 'club') { ctx.fade?.(); reset(); }
     else if (k === 'door') ctx.goInside?.();
     else if (k === 'bar') enterBar();
   }
-  function reset() { S.card = []; S.done = false; teeUp(0); const h = holes[0]; cart.h = Math.atan2(h.dir0[0], h.dir0[1]); cart.x = h.tee[0] - h.dir0[1] * 5 - h.dir0[0] * 7; cart.z = h.tee[1] + h.dir0[0] * 5 - h.dir0[1] * 7; cart.v = 0; S.state = 'cart'; S.led = true; say('Hole 1', 'A fresh round.', 2.5); }
+  // A round of golf is something you start (at the club's front door) and can quit; otherwise you are just out on Story St.
+  function reset() { S.card = []; S.done = false; S.golf = true; S.pen = false; S.phase = 'aim'; teeUp(0); const h = holes[0]; cart.h = Math.atan2(h.dir0[0], h.dir0[1]); cart.x = h.tee[0] - h.dir0[1] * 5 - h.dir0[0] * 7; cart.z = h.tee[1] + h.dir0[0] * 5 - h.dir0[1] * 7; cart.v = 0; S.state = 'cart'; S.led = true; say('Hole 1', 'A fresh round.', 2.5); }
+
+  function quit() {
+    if (!S.golf || S.state === 'bar' || S.state === 'pool') return false;
+    S.golf = false; S.done = true; S.pen = false; S.phase = 'aim'; S.msgT = 0;
+    if (S.state === 'address' || S.state === 'landed' || S.state === 'flight' || S.state === 'holed') { S.state = 'foot'; S.yaw = camera.rotation.y; S.pitch = 0; }
+    ctx.toast?.('Round over. The club will start you a new one any time.');
+    return true;
+  }
+  function summon() {                                    // your cart pulls up beside you, wherever you are outside
+    if (S.state !== 'foot' && S.state !== 'landed') return false;
+    const fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw), rx = Math.cos(S.yaw), rz = -Math.sin(S.yaw);
+    for (const [f, r] of [[3.6, 1.6], [3.6, -1.6], [5.2, 0], [0.5, 3.4], [0.5, -3.4], [-3.6, 1.6], [-3.6, -1.6], [7, 0], [-6, 0]]) {
+      const x = S.px + fx * f + rx * r, z = S.pz + fz * f + rz * r;
+      if (blockedAt(x, z, 1.5)) continue;
+      cart.x = x; cart.z = z; cart.h = cart.d = Math.atan2(fx, fz); cart.v = 0; cart.slip = 0; if (S.state === 'landed') S.state = 'foot';
+      ctx.toast?.('Your cart pulls up.'); return true;
+    }
+    ctx.toast?.('No room for the cart here.'); return false;
+  }
 
   /* ---------------------------------------------------------------- hole map (top-right corner) */
   const mapEl = document.createElement('canvas'); mapEl.id = 'gmap'; mapEl.className = 'hidden';
@@ -734,14 +737,14 @@ export function createGolf(THREE, ctx) {
     get label() { return S.state === 'pool' ? pool.label : S.state === 'address' ? (S.phase === 'acc' ? 'STOP' : 'SWING') : S.state === 'cart' ? 'EXIT' : S.state === 'landed' ? 'NEXT' : 'USE'; },
     get canBack() { return S.state === 'address' || S.state === 'pool'; },
     back() { if (S.state === 'pool') leavePool(); else if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; } },
-    use, reset,
+    use, reset, quit, summon,
     // test hook: play a shot with a given power (0..1) and accuracy (-1..1, 0 = straight)
     hit(p, dev = 0) { if (S.state === 'address') { S.power = clamp(p, 0, 1); swing(dev); } },
-    enter() { setBar(false); S.state = 'foot'; S.px = APT.x; S.pz = APT.z + APT.d / 2 + 4.8; S.yaw = -2.2; S.pitch = 0; mapEl.classList.remove('hidden');   // out of your front door, looking down the street to the club
-      say('Story St.', S.led ? '' : 'The cart outside the golf club will take you to the first tee.', 3.5); },
-    leave() { setBar(false); if (S.state === 'pool') { pool.stop(); tenderHome(); S.state = 'bar'; } if (S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; } mapEl.classList.add('hidden'); },
+    enter() { setBar(false); S.state = 'foot'; S.px = APT.x; S.pz = APT.z + APT.d / 2 + 4.8; S.yaw = -2.2; S.pitch = 0;   // out of your front door, looking down the street to the club
+      say('Story St.', S.golf ? '' : 'Your cart is parked outside. The golf club starts rounds at its front door.', 4); },
+    leave() { setBar(false); if (S.state === 'pool') { pool.stop(); camera.fov = 68; camera.updateProjectionMatrix(); tenderHome(); S.state = 'bar'; } if (S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; } mapEl.classList.add('hidden'); },
     look(dx, dy) {
-      if (S.state === 'pool') { pool.look(dx); return; }
+      if (S.state === 'pool') { pool.look(dx, dy); return; }
       if (S.state === 'address') { if (S.phase !== 'acc') S.aim -= dx * 0.0011; return; }
       if (S.state === 'foot' || S.state === 'bar') { S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.3, 1.3); }
     },
@@ -761,7 +764,7 @@ export function createGolf(THREE, ctx) {
       S.t += dt; S.msgT -= dt; S.swingT -= dt;
       const { f, s } = ctx.axes(), b = S.ball, h = hole();
       S.prompt = null;
-      if (camera.fov !== 68 && S.state !== 'cart') { camera.fov = 68; camera.updateProjectionMatrix(); }
+      if (camera.fov !== 68 && S.state !== 'cart' && S.state !== 'pool') { camera.fov = 68; camera.updateProjectionMatrix(); }
       if (S.state === 'bar') { updateBar(dt, f, s); return; }
       if (S.state === 'pool') { updatePool(dt, s); return; }
       if (S.state === 'landed' && (Math.abs(f) > 0.3 || Math.abs(s) > 0.3)) S.state = 'foot';        // walk off instead of skipping ahead
@@ -773,11 +776,11 @@ export function createGolf(THREE, ctx) {
         }
         camera.position.set(S.px, HT(S.px, S.pz) + 1.7, S.pz); camera.rotation.set(S.pitch, S.yaw, 0);
         const near = (x, z, r) => Math.hypot(x - S.px, z - S.pz) < r, farBall = !S.done && !near(b.x, b.z, 3.6);
-        if (near(cart.x, cart.z, 3.6)) S.prompt = { k: 'cart', t: S.led ? 'Drive the golf cart' : 'Take the cart to the first tee' };
+        if (near(cart.x, cart.z, 3.6)) S.prompt = { k: 'cart', t: 'Drive the golf cart' };
         else if (!S.done && near(b.x, b.z, 3.6)) S.prompt = { k: 'ball', t: 'Play your shot' };
         else if (near(APT.x, APT.z + APT.d / 2 + 0.9, 2.5)) S.prompt = { k: 'door', t: 'No. 7 — go up to your apartment' };
         else if (near(LKY.x, LKY.z + LKY.d / 2 + 0.9, 2.5)) S.prompt = { k: 'bar', t: 'Go into Lucky’s' };
-        else if (near(0, -8, 4)) S.prompt = { k: 'club', t: 'Clubhouse' };
+        else if (near(0, -8, 4.5)) S.prompt = { k: 'club', t: S.golf ? 'Start the round over from the first tee' : 'Play a round of golf' };
         else if (farBall && S.led) S.prompt = { k: 'next', t: S.strokes === 0 ? `Go to the hole ${S.hole + 1} tee` : 'Go to your ball' };
       } else if (S.state === 'landed') {
         S.prompt = { k: 'next', t: S.strokes === 0 ? `Go to the hole ${S.hole + 1} tee` : 'Next shot' };
@@ -846,7 +849,7 @@ export function createGolf(THREE, ctx) {
         S.endT -= dt; S.camLook.set(h.cup[0], HT(h.cup[0], h.cup[1]) + 0.5, h.cup[1]); camera.lookAt(S.camLook);
         if (S.endT <= 0) {
           S.px = h.cup[0] + 2.5; S.pz = h.cup[1] + 2.5;
-          if (S.hole === holes.length - 1) { S.done = true; S.state = 'foot'; ctx.finish?.({ card: S.card.slice(), pars: holes.map(x => x.par) }); }
+          if (S.hole === holes.length - 1) { S.done = true; S.golf = false; S.state = 'foot'; ctx.finish?.({ card: S.card.slice(), pars: holes.map(x => x.par) }); }
           else { teeUp(S.hole + 1); S.state = 'landed'; S.yaw = Math.atan2(S.ball.x - S.px, S.ball.z - S.pz) + Math.PI; S.pitch = 0; say(`Next: hole ${S.hole + 1}`, `Par ${hole().par} · ${hole().len} m`, 4); }
         }
       }
@@ -856,7 +859,7 @@ export function createGolf(THREE, ctx) {
         cartG.position.set(cart.x, HT(cart.x, cart.z), cart.z); cartG.rotation.set(Math.atan(gx * fx + gz * fz), cart.h + Math.PI, -Math.atan(gx * fz - gz * fx) + cart.slip * 0.22); }
       cartFx(dt);
       wheel.rotation.z = -s * 0.8 * (S.state === 'cart' ? 1 : 0);
-      ballM.position.set(b.x, b.y + 0.12, b.z);
+      ballM.position.set(b.x, b.y + 0.12, b.z); ballM.visible = S.golf || S.state === 'holed'; mapEl.classList.toggle('hidden', !S.golf);
       const showBeam = !S.done && (S.state === 'foot' || S.state === 'cart' || S.state === 'landed'); beam.visible = showBeam; beam.position.set(b.x, b.y + 17, b.z);
       const cu = hole().cup; pinBeam.visible = !S.done && S.state !== 'holed' && surfaceAt(b.x, b.z) !== 'green'; pinBeam.position.set(cu[0], HT(cu[0], cu[1]) + 22, cu[1]);
       for (const fl of flags) fl.fl.rotation.y = Math.sin(S.t * 2 + fl.g.position.x) * 0.25;
@@ -875,10 +878,10 @@ export function createGolf(THREE, ctx) {
         else { const k = clamp(1 - S.swingT / 0.32, 0, 1); ang = lerp(-S.power * top, thru, k * k * (3 - 2 * k)); }
         swingG.rotation.z = ang;
       }
-      drawMap();
+      if (S.golf) drawMap();
       // HUD
       const total = S.card.reduce((acc, v, i) => acc + v - holes[i].par, 0), dcup = distToCup(), surf = surfaceAt(b.x, b.z);
-      let html = `<div class="g-top"><div class="pill">Hole ${S.hole + 1} · Par ${h.par}</div><div class="pill">${S.done ? 'Round complete' : S.state === 'address' || S.state === 'flight' ? `Shot ${Math.max(1, S.strokes + (addr ? 1 : 0))}` : `Strokes ${S.strokes}`}</div><div class="pill">Total ${vs(total)}</div></div>`;
+      let html = !S.golf ? '' : `<div class="g-top"><div class="pill">Hole ${S.hole + 1} · Par ${h.par}</div><div class="pill">${S.done ? 'Round complete' : S.state === 'address' || S.state === 'flight' ? `Shot ${Math.max(1, S.strokes + (addr ? 1 : 0))}` : `Strokes ${S.strokes}`}</div><div class="pill">Total ${vs(total)}</div></div>`;
       if (S.msgT > 0) html += `<div class="g-msg">${S.msg}${S.sub ? `<small>${S.sub}</small>` : ''}</div>`;
       if (addr) {
         const need = needPower(c), dh = HT(cu[0], cu[1]) - b.y, ap = accPos(), acc = S.phase === 'acc';
@@ -888,13 +891,14 @@ export function createGolf(THREE, ctx) {
           <div class="g-acc${acc ? ' live' : ''}"><span></span>${acc ? `<u style="left:${(50 + ap * 50).toFixed(1)}%"></u>` : ''}<em>${c.putter ? 'PULL · STRAIGHT · PUSH' : 'HOOK · STRAIGHT · SLICE'}</em></div>
           <div class="g-tip">${acc ? (ctx.touch ? 'Tap STOP when the line is in the middle' : 'Click again when the line is in the middle')
             : S.phase === 'power' ? (ctx.touch ? 'Let go at the white mark' : 'Release at the white mark')
-            : ctx.touch ? 'Drag or stick ←/→ to aim · stick ↑/↓ changes club · hold SWING for power' : 'Mouse or A/D to aim · W/S changes club · hold click for power · E steps away'}</div>`;
+            : ctx.touch ? 'Drag or stick ←/→ to aim · stick ↑/↓ changes club · hold SWING for power' : 'Mouse or A/D to aim · W/S changes club · hold click for power · E steps away · Q quits the round'}</div>`;
       } else if (S.state === 'foot' || S.state === 'cart' || S.state === 'landed') {
         const heading = S.state === 'cart' ? cart.h : S.yaw + Math.PI, hd = Math.hypot(b.x - S.px, b.z - S.pz);
         if (!S.done && S.state !== 'landed') html += `<div class="g-wind">${S.strokes === 0 ? `Hole ${S.hole + 1} tee` : 'Your ball'} <b>${arrow(b.x, b.z, heading)} ${hd.toFixed(0)} m</b></div>`;
         if (S.prompt) html += `<div class="g-prompt">${ctx.touch ? `${api.label} — ${S.prompt.t}` : S.prompt.k === 'next' ? `<kbd>E</kbd> — ${S.prompt.t}` : `<kbd>E</kbd> or click — ${S.prompt.t}`}</div>`;
-        if (S.state === 'cart') html += `<div class="g-tip">${ctx.touch ? 'Stick to drive' : 'W/S to drive · A/D to steer · hold Shift to drift · Space for turbo'}</div><div class="g-wind" style="${ctx.touch ? 'top:96px;left:12px' : 'top:auto;bottom:74px;left:50%;transform:translateX(-50%)'}"><b>${Math.round(Math.abs(cart.v) * 3.6)}</b> km/h${S.turbo ? ' · <b>TURBO</b>' : ''}${S.drift ? ' · <b>DRIFT</b>' : ''}</div>`;
-        else if (S.state === 'landed') html += `<div class="g-tip">${ctx.touch ? 'Or move the stick to walk' : 'Or use WASD to walk, and take the cart if you like'}</div>`;
+        if (S.state === 'cart') html += `<div class="g-tip">${ctx.touch ? 'Stick to drive' : `W/S to drive · A/D to steer · hold Shift to drift · Space for turbo${S.golf ? ' · Q quits the round' : ''}`}</div><div class="g-wind" style="${ctx.touch ? 'top:96px;left:12px' : 'top:auto;bottom:74px;left:50%;transform:translateX(-50%)'}"><b>${Math.round(Math.abs(cart.v) * 3.6)}</b> km/h${S.turbo ? ' · <b>TURBO</b>' : ''}${S.drift ? ' · <b>DRIFT</b>' : ''}</div>`;
+        else if (S.state === 'landed') html += `<div class="g-tip">${ctx.touch ? 'Or move the stick to walk' : 'Or use WASD to walk · C calls your cart · Q quits the round'}</div>`;
+        else if (!ctx.touch) html += `<div class="g-tip">C calls your cart${S.golf ? ' · Q quits the round' : ''}</div>`;
       }
       ctx.hud(html);
     },

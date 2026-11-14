@@ -621,7 +621,7 @@ function lock() {
   try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* the "click to look" hint covers this */ }
 }
 function unlock() { if (locked()) { leaving = true; document.exitPointerLock(); } }
-function setPaused(v) { S.paused = v; $('pause').classList.toggle('hidden', !v); $('homeBtn').classList.toggle('hidden', S.mode !== 'outside'); }
+function setPaused(v) { S.paused = v; $('pause').classList.toggle('hidden', !v); $('homeBtn').classList.toggle('hidden', S.mode !== 'outside'); $('quitGolfBtn').classList.toggle('hidden', !(S.mode === 'outside' && golf?.S.golf)); }
 document.addEventListener('pointerlockchange', () => {
   if (locked()) { setPaused(false); return; }
   if (leaving) { leaving = false; return; }
@@ -629,6 +629,7 @@ document.addEventListener('pointerlockchange', () => {
   else if (S.mode === 'world' || S.mode === 'outside') setPaused(true);
 });
 $('pause').addEventListener('click', () => { setPaused(false); lock(); });
+$('quitGolfBtn').addEventListener('click', e => { e.stopPropagation(); setPaused(false); golf?.quit(); lock(); });   // end the round but stay outside
 $('homeBtn').addEventListener('click', e => { e.stopPropagation(); setPaused(false); goInside(); });      // Esc on the golf course offers a way home
 
 /* ------------------------------------------------------------------ HUD helpers */
@@ -906,7 +907,8 @@ addEventListener('keydown', e => {
     else if (S.mode === 'world' && e.code === 'KeyE') use();
     else if (S.mode === 'outside' && e.code === 'KeyE') golf.use();
     else if (S.mode === 'outside' && e.code === 'Escape') setPaused(true);
-  } else if (e.code === 'Space' && S.mode === 'game') active?.down?.('key');
+  } else if (S.mode === 'outside' && !S.paused && e.code === 'KeyC') golf.summon();
+  else if (S.mode === 'outside' && !S.paused && e.code === 'KeyQ') golf.quit(); else if (e.code === 'Space' && S.mode === 'game') active?.down?.('key');
   else if (e.code === 'Space' && S.mode === 'outside' && !S.paused) golf.down('key');
 });
 addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Space') { if (S.mode === 'game') active?.up?.('key'); else if (S.mode === 'outside') golf.up(); } });
@@ -936,7 +938,7 @@ function touchUI() {
 }
 if (TOUCH) {
   const el = document.createElement('div'); el.id = 'touch'; el.className = 'hidden';
-  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
+  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tCall" class="tMini hidden">CART</button><button id="tQuit" class="tMini hidden">QUIT GOLF</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
   document.body.appendChild(el);
   const css = document.createElement('style');
   css.textContent = `
@@ -949,6 +951,8 @@ if (TOUCH) {
       background:rgba(242,180,65,.9);color:#1a1303;border:0;font-weight:800;font-size:13.5px;letter-spacing:.03em;touch-action:none}
     #tAct:active{filter:brightness(1.15)}
     .tCart{position:absolute;right:max(132px,calc(env(safe-area-inset-right) + 106px));width:72px;height:72px;border-radius:50%;pointer-events:auto;background:rgba(16,21,31,.82);color:#fff;border:2px solid rgba(255,255,255,.4);font-weight:800;font-size:11.5px;letter-spacing:.03em;touch-action:none}
+    .tMini{position:absolute;left:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 13px;font-weight:700;font-size:12px;letter-spacing:.03em}
+    #tCall{top:136px} #tQuit{top:176px}
     .tCart.on{background:rgba(242,180,65,.92);color:#1a1303} #tTurbo{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tDrift{bottom:max(34px,env(safe-area-inset-bottom))}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
@@ -999,6 +1003,8 @@ if (TOUCH) {
   act.addEventListener('touchstart', e => { e.preventDefault(); if (S.mode === 'game') active?.down?.('btn'); else if (S.mode === 'outside') golf.down('btn'); else if (S.mode === 'world') use(); }, { passive: false });
   act.addEventListener('touchend', e => { e.preventDefault(); if (S.mode === 'game') active?.up?.('btn'); else if (S.mode === 'outside') golf.up(); }, { passive: false });
   $('tExit').addEventListener('click', () => { if (S.mode === 'outside') golf.back(); else exitGame(true); });
+  $('tCall').addEventListener('click', () => { if (S.mode === 'outside') golf.summon(); });
+  $('tQuit').addEventListener('click', () => { if (S.mode === 'outside') golf.quit(); });
   for (const [id, code] of [['tTurbo', 'Space'], ['tDrift', 'ShiftLeft']]) {            // cart buttons: hold to boost or slide
     const b = $(id), set = v => e => { e.preventDefault(); keys[code] = v; b.classList.toggle('on', v); };
     b.addEventListener('touchstart', set(true), { passive: false }); b.addEventListener('touchend', set(false), { passive: false }); b.addEventListener('touchcancel', set(false), { passive: false });
@@ -1098,6 +1104,8 @@ function frame(now) {
   if (TOUCH) {
     const lb = S.mode === 'game' ? (active?.label || 'GO') : S.mode === 'outside' ? golf.label : 'USE'; if (lb !== lastLabel) { lastLabel = lb; $('tAct').textContent = lb; }
     $('tExit').classList.toggle('hidden', !(S.mode === 'game' || (S.mode === 'outside' && golf.canBack)));
+    const out = S.mode === 'outside' && !S.paused, gs = out ? golf.S.state : '';
+    $('tCall').classList.toggle('hidden', !(gs === 'foot' || gs === 'landed')); $('tQuit').classList.toggle('hidden', !(out && golf.S.golf && gs !== 'bar' && gs !== 'pool'));
     const inCart = S.mode === 'outside' && golf.S.state === 'cart' && !S.paused;
     if (inCart !== cartBtns) { cartBtns = inCart; for (const id of ['tTurbo', 'tDrift']) { $(id).classList.toggle('hidden', !inCart); $(id).classList.remove('on'); } if (!inCart) keys.Space = keys.ShiftLeft = false; }
   }

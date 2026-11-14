@@ -72,18 +72,29 @@ export function createPool(THREE, host) {
   }
   for (const [px, pz, pr] of POCKETS) { const m = new THREE.Mesh(new THREE.CircleGeometry(pr * 0.86, 18), new THREE.MeshBasicMaterial({ color: 0x050505 })); m.rotation.x = -Math.PI / 2; m.position.set(clamp(px, -L + 0.02, L - 0.02), top + 0.003, clamp(pz, -W + 0.02, W - 0.02)); group.add(m); }
   { const m = new THREE.Mesh(new THREE.CircleGeometry(0.012, 10), new THREE.MeshBasicMaterial({ color: 0xdfeee0 })); m.rotation.x = -Math.PI / 2; m.position.set(-L / 2, top + 0.002, 0); group.add(m); }   // head spot
+  // dressing for the overhead view: cushions, rail sights and the head string
+  { const cush = new THREE.MeshLambertMaterial({ color: 0x176a3b }), sight = new THREE.MeshBasicMaterial({ color: 0xe9dfc4 }), put = (g, m, x, y, z) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); group.add(o); return o; };
+    for (const k of [-1, 1]) { put(new THREE.BoxGeometry(0.028, 0.03, 2 * W - 0.2), cush, k * (L + 0.012), top + 0.015, 0); }
+    for (const k of [-1, 1]) for (const kx of [-1, 1]) put(new THREE.BoxGeometry(L - 0.2, 0.03, 0.028), cush, kx * (L / 2 + 0.005), top + 0.015, k * (W + 0.012));
+    for (const k of [-1, 1]) { for (let i = 1; i < 8; i++) if (i !== 4) { const d = put(new THREE.CircleGeometry(0.011, 4), sight, -L + (i * 2 * L) / 8, top + 0.052, k * (W + 0.085)); d.rotation.x = -Math.PI / 2; } for (let i = 1; i < 4; i++) { const d = put(new THREE.CircleGeometry(0.011, 4), sight, k * (L + 0.085), top + 0.052, -W + (i * 2 * W) / 4); d.rotation.x = -Math.PI / 2; } }
+    const hs = put(new THREE.BoxGeometry(0.004, 0.0006, 2 * W - 0.02), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16 }), -L / 2, top + 0.0012, 0); }
   // the cue, the aiming line and the ghost ball
   const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.0055, 1.45, 8), new THREE.MeshLambertMaterial({ color: 0xd8b98a })); group.add(stick);
   { const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0115, 0.42, 8), new THREE.MeshLambertMaterial({ color: 0x2a1a12 })); butt.position.y = 0.515; stick.add(butt); const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0056, 0.02, 8), new THREE.MeshLambertMaterial({ color: 0x3b7fb8 })); tip.position.y = -0.725; stick.add(tip); }
-  const lineG = new THREE.BufferGeometry(); lineG.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
-  const line = new THREE.LineSegments(lineG, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })); line.frustumCulled = false; group.add(line);
+  const segGeo = new THREE.BoxGeometry(1, 0.0012, 1);
+  const mkSeg = (color, opacity) => { const m = new THREE.Mesh(segGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity })); m.visible = false; group.add(m); return m; };
+  const setSeg = (m, x0, z0, x1, z1, w) => { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); m.visible = len > 0.01; if (!m.visible) return; m.position.set((x0 + x1) / 2, top + 0.0035, (z0 + z1) / 2); m.scale.set(len, 1, w); m.rotation.y = -Math.atan2(dz, dx); };
+  const gAim = mkSeg(0xffffff, 0.9), gObj = mkSeg(0xffd84a, 0.95), gCue = mkSeg(0x9fd8ff, 0.8);       // your line, the object ball's path, where the cue ball goes
+  const mark = new THREE.Group(); group.add(mark);                                                   // the crosshair you aim with
+  { const mm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide }); const r = new THREE.Mesh(new THREE.RingGeometry(0.026, 0.033, 24), mm); r.rotation.x = -Math.PI / 2; mark.add(r);
+    for (const [w, d] of [[0.09, 0.006], [0.006, 0.09]]) mark.add(new THREE.Mesh(new THREE.BoxGeometry(w, 0.001, d), mm)); mark.position.y = top + 0.006; mark.visible = false; }
   const ghost = new THREE.Mesh(new THREE.RingGeometry(R * 0.78, R, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide })); ghost.rotation.x = -Math.PI / 2; group.add(ghost);
   const UP = new THREE.Vector3(0, 1, 0), v3 = new THREE.Vector3(), ax3 = new THREE.Vector3(), camTo = new THREE.Vector3(), lookTo = new THREE.Vector3(), lookNow = new THREE.Vector3();
 
   const P = {
     on: false, turn: 'you', phase: 'aim',        // aim | power | roll | think | over
     aim: Math.PI / 2, power: 0, cT: 0, open: true, breakShot: true, groups: { you: null, her: null }, pre: { solid: 7, stripe: 7 },
-    ev: null, msg: '', msgT: 0, thinkT: 0, plan: null, winner: null, snap: true, strike: 0, shots: 0, watch: [0, -W - 0.62, 0], jump: true,
+    tx: 0, tz: 0, tall: false, ev: null, msg: '', msgT: 0, thinkT: 0, plan: null, winner: null, snap: true, strike: 0, shots: 0, watch: [0, -W - 0.62, 0], jump: true,
   };
   const cue = balls[0];
   const left = g => balls.filter(b => b.on && typeOf(b.n) === g).length;
@@ -95,7 +106,7 @@ export function createPool(THREE, host) {
     const order = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 6, 13, 7, 14, 15], s = 2 * R + 0.0008; let k = 0;
     for (let row = 0; row < 5; row++) for (let i = 0; i <= row; i++) { const b = balls[order[k++]]; b.x = L / 2 + row * s * 0.866; b.z = (i - row / 2) * s; b.vx = b.vz = 0; b.on = true; b.mesh.rotation.set(Math.PI / 2, 0, Math.PI / 2 + (b.n % 2 ? 0.5 : -0.4)); }
     cue.x = -L / 2; cue.z = 0; cue.vx = cue.vz = 0; cue.on = true;
-    Object.assign(P, { turn: 'you', phase: 'aim', aim: Math.PI / 2, power: 0, open: true, breakShot: true, groups: { you: null, her: null }, winner: null, ev: null, plan: null, scan: null, strike: 0, shots: 0 });
+    Object.assign(P, { turn: 'you', phase: 'aim', aim: Math.PI / 2, power: 0, open: true, breakShot: true, groups: { you: null, her: null }, winner: null, ev: null, plan: null, scan: null, strike: 0, shots: 0, tx: L / 2, tz: 0 });
     sync();
   }
   function sync() { for (const b of balls) { b.mesh.visible = b.on; b.mesh.position.set(b.x, Y, b.z); } }
@@ -103,6 +114,18 @@ export function createPool(THREE, host) {
     cue.on = true; cue.vx = cue.vz = 0;
     for (const dx of [0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3]) for (let i = 0; i < 15; i++) { const x = -L / 2 + dx, z = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.07; if (Math.abs(z) < W - R - 0.01 && free(x, z, cue)) { cue.x = x; cue.z = z; return; } }
     cue.x = -L / 2; cue.z = 0;
+  }
+  // ball in hand for her: set the cue ball down for an easy straight shot if there is one
+  function placeHer() {
+    cue.on = true; cue.vx = cue.vz = 0;
+    for (const t of legal('her')) for (const [px, pz] of POCKETS) {
+      const qx = clamp(px, -L + 0.03, L - 0.03), qz = clamp(pz, -W + 0.02, W - 0.02), d = Math.hypot(qx - t.x, qz - t.z); if (d < 0.05) continue;
+      const ux = (qx - t.x) / d, uz = (qz - t.z) / d, x = t.x - ux * (2 * R + 0.36), z = t.z - uz * (2 * R + 0.36);
+      if (Math.abs(x) > L - R - 0.02 || Math.abs(z) > W - R - 0.02 || !free(x, z, cue)) continue;
+      cue.x = x; cue.z = z;
+      if (clear(x, z, t.x - ux * 2 * R, t.z - uz * 2 * R, cue, t) && clear(t.x, t.z, qx, qz, t, null)) return;
+    }
+    placeCue();
   }
   function respotEight() { const b = balls[8]; b.on = true; b.vx = b.vz = 0; for (let i = 0; i < 40; i++) { const x = L / 2 + i * 0.03; if (x < L - R && free(x, 0, b)) { b.x = x; b.z = 0; return; } } b.x = 0; b.z = 0; }
 
@@ -130,22 +153,22 @@ export function createPool(THREE, host) {
     if (ev.scratch) placeCue();
     P.breakShot = false; sync();
     const next = keep ? who : opp; P.turn = next;
-    if (foul) { say(`${why} — ${next === 'you' ? 'your shot' : 'her shot'}`); if (who === 'you' && Math.random() < 0.6) host.line?.(ev.scratch ? '“Scratch. I will take that.”' : '“That is a foul, hon.”'); }
+    if (foul) { say(`${why} — ${next === 'you' ? 'you have ball in hand' : 'she has ball in hand'}`, 3.2); if (who === 'you' && Math.random() < 0.6) host.line?.(ev.scratch ? '“Scratch. I will take that.”' : '“That is a foul, hon.”'); }
     else if (note) say(note);
     else if (keep) { say(who === 'you' ? 'Nice shot — go again' : 'She keeps the table'); if (who === 'you' && Math.random() < 0.35) host.line?.('“Nice shot.”'); }
     else say(next === 'you' ? 'Your shot' : 'Her shot');
-    if (next === 'you') { P.phase = 'aim'; aimAtSomething(); } else { P.phase = 'think'; P.thinkT = 1.5; P.plan = null; P.scan = null; }
+    if (next === 'you') { aimAtSomething(); P.phase = foul ? 'place' : 'aim'; if (foul) { cue.on = true; if (!ev.scratch && !free(cue.x, cue.z, cue)) placeCue(); sync(); } }
+    else { if (foul) { placeHer(); sync(); } P.phase = 'think'; P.thinkT = 1.5; P.plan = null; P.scan = null; }
   }
   // which balls may this player hit first?
   function legal(who) { const g = P.groups[who]; if (P.open) return balls.filter(b => b.on && b.n && b.n !== 8); if (left(g) === 0) return balls.filter(b => b.on && b.n === 8); return balls.filter(b => b.on && typeOf(b.n) === g); }
   function aimAtSomething() {                         // start each turn pointed at the nearest ball you are allowed to hit
     const t = legal('you').sort((a, b) => Math.hypot(a.x - cue.x, a.z - cue.z) - Math.hypot(b.x - cue.x, b.z - cue.z))[0];
-    if (t) P.aim = Math.atan2(t.x - cue.x, t.z - cue.z); P.snap = true; watchSpot();
+    if (t) { P.tx = t.x; P.tz = t.z; P.aim = Math.atan2(t.x - cue.x, t.z - cue.z); } else { P.tx = cue.x + 0.5; P.tz = cue.z; } watchSpot();
   }
   function watchSpot() {                              // she waits on the far side of the table from where you are shooting
     const dx = Math.sin(P.aim), dz = Math.cos(P.aim); let best = -1e9;
-    const tall = camera.aspect < 1.15;                // never between the table and the wide-shot camera
-    for (const [x, z] of [[0, -W - 0.62], [0, W + 0.62], [L + 0.62, 0], [-L - 0.62, 0]]) { if (tall ? x > 0 : z > 0) continue; const sc = (x - cue.x) * dx + (z - cue.z) * dz; if (sc > best) { best = sc; P.watch = [x, z, Math.atan2(-x, -z)]; } }
+    for (const [x, z] of [[0, -W - 0.62], [0, W + 0.62], [L + 0.62, 0], [-L - 0.62, 0]]) { const sc = (x - cue.x) * dx + (z - cue.z) * dz; if (sc > best) { best = sc; P.watch = [x, z, Math.atan2(-x, -z)]; } }
   }
   const clear = (x0, z0, x1, z1, a, b) => {           // is the path between two points free of other balls?
     const dx = x1 - x0, dz = z1 - z0, l2 = dx * dx + dz * dz;
@@ -196,7 +219,7 @@ export function createPool(THREE, host) {
     return { x: cue.x + dx * t, z: cue.z + dz * t, hit };
   }
   // where someone stands to play the cue ball along an aim: just off the table, behind the ball
-  function stance(aim) { const dx = Math.sin(aim), dz = Math.cos(aim); let d = 0.5; while (d < 3 && Math.abs(cue.x - dx * d) < L + 0.42 && Math.abs(cue.z - dz * d) < W + 0.42) d += 0.05; return [cue.x - dx * d, cue.z - dz * d]; }
+  function stance(aim) { const dx = Math.sin(aim), dz = Math.cos(aim); let d = 0.5; while (d < 3 && Math.abs(cue.x - dx * d) < L + 0.6 && Math.abs(cue.z - dz * d) < W + 0.6) d += 0.05; return [cue.x - dx * d, cue.z - dz * d]; }
 
   // the bartender walks round the table (never across it) to wherever she needs to be
   const her = { x: 0, z: -W - 0.62, there: true };
@@ -210,24 +233,36 @@ export function createPool(THREE, host) {
     host.tender?.(her.x, her.z, far > 0.2 ? Math.atan2(gx - her.x, gz - her.z) : ry, far > 0.2 ? 'walk' : pose, false);
   }
 
+  function hideGuides() { gAim.visible = gObj.visible = gCue.visible = ghost.visible = mark.visible = false; }
+
   const api = {
     P, balls, simulate: (a, s) => simulate(balls, a, s),
     get on() { return P.on; },
-    get label() { return P.phase === 'over' ? 'RACK' : 'SHOOT'; },
-    start() { P.on = true; rack(); P.snap = true; P.jump = true; watchSpot(); say('8-ball — you break', 3); host.line?.('“Rack ’em up. You break.”'); },
-    stop() { P.on = false; rack(); stick.visible = line.visible = ghost.visible = false; },
-    look(dx) { if (P.turn === 'you' && P.phase === 'aim') P.aim -= dx * 0.0016; },
+    get label() { return P.phase === 'over' ? 'RACK' : P.phase === 'place' ? 'PLACE' : 'SHOOT'; },
+    start() { P.on = true; rack(); P.jump = true; watchSpot(); if (host.lamp) host.lamp.visible = false; say('8-ball — you break', 3); host.line?.('“Rack ’em up. You break.”'); },
+    stop() { P.on = false; rack(); hideGuides(); stick.visible = false; if (host.lamp) host.lamp.visible = true; camera.up.set(0, 1, 0); },
+    // the mouse (or a finger) slides a crosshair over the table; the cue points at it. With ball in hand it slides the cue ball.
+    look(dx, dy = 0) {
+      if (P.turn !== 'you' || (P.phase !== 'aim' && P.phase !== 'place')) return;
+      const k = 0.0021, mx = (P.tall ? -dy : dx) * k, mz = (P.tall ? dx : dy) * k;
+      if (P.phase === 'place') { const x = clamp(cue.x + mx, -L + R, L - R), z = clamp(cue.z + mz, -W + R, W - R); if (free(x, z, cue)) { cue.x = x; cue.z = z; } else if (free(x, cue.z, cue)) cue.x = x; else if (free(cue.x, z, cue)) cue.z = z; sync(); return; }
+      P.tx = clamp(P.tx + mx, -L - 0.2, L + 0.2); P.tz = clamp(P.tz + mz, -W - 0.2, W + 0.2);
+    },
     down() {
-      if (P.phase === 'over') { rack(); P.snap = true; say('New rack — you break', 2.5); host.line?.('“Again? You break.”'); return; }
+      if (P.phase === 'over') { rack(); say('New rack — you break', 2.5); host.line?.('“Again? You break.”'); return; }
+      if (P.turn === 'you' && P.phase === 'place') { if (free(cue.x, cue.z, cue)) { P.phase = 'aim'; aimAtSomething(); } return; }
       if (P.turn === 'you' && P.phase === 'aim') { P.phase = 'power'; P.cT = 0; P.power = 0; }
     },
     up() { if (P.turn !== 'you' || P.phase !== 'power') return; if (P.cT > 0.07) shoot(P.aim, 0.5 + P.power * 6.3); else P.phase = 'aim'; },
     // test hook
-    hit(aim, speed) { if (P.phase === 'aim' || P.phase === 'power') { P.aim = aim; shoot(aim, speed); } },
+    hit(aim, speed) { if (P.phase === 'aim' || P.phase === 'power' || P.phase === 'place') { P.aim = aim; shoot(aim, speed); } },
     update(dt, s) {
       P.msgT -= dt; P.strike -= dt;
       const mineTurn = P.turn === 'you';
-      if (P.phase === 'aim' && mineTurn) P.aim -= s * dt * 0.45;
+      if (P.phase === 'aim' && mineTurn) {
+        if (s) { const a = -s * dt * 0.5, cx = P.tx - cue.x, cz = P.tz - cue.z, co = Math.cos(a), si = Math.sin(a); P.tx = cue.x + cx * co + cz * si; P.tz = cue.z - cx * si + cz * co; }   // A/D: fine adjustment
+        if (Math.hypot(P.tx - cue.x, P.tz - cue.z) > 0.03) P.aim = Math.atan2(P.tx - cue.x, P.tz - cue.z);
+      }
       else if (P.phase === 'power') { P.cT += dt; const p = (P.cT / 1.15) % 2; P.power = p < 1 ? p : 2 - p; }
       else if (P.phase === 'think') {
         if (!P.plan) planStep();
@@ -252,38 +287,39 @@ export function createPool(THREE, host) {
         v3.set(-dx, 0.11, -dz).normalize(); stick.quaternion.setFromUnitVectors(UP, v3);
         stick.position.set(cue.x, Y + 0.004, cue.z).addScaledVector(v3, R + pull + 0.725);
       }
-      const guide = mineTurn && (P.phase === 'aim' || P.phase === 'power') && cue.on; line.visible = guide; ghost.visible = false;
+      const guide = mineTurn && (P.phase === 'aim' || P.phase === 'power') && cue.on; hideGuides();
       if (guide) {
-        const r = ray(P.aim), p = lineG.attributes.position.array, y = Y;
-        p[0] = cue.x; p[1] = y; p[2] = cue.z; p[3] = r.x; p[4] = y; p[5] = r.z;
-        if (r.hit) { const ux = (r.hit.x - r.x) / (2 * R), uz = (r.hit.z - r.z) / (2 * R); p[6] = r.hit.x; p[7] = y; p[8] = r.hit.z; p[9] = r.hit.x + ux * 0.32; p[10] = y; p[11] = r.hit.z + uz * 0.32; ghost.visible = true; ghost.position.set(r.x, top + 0.004, r.z); }
-        else { p[6] = p[9] = r.x; p[7] = p[10] = y; p[8] = p[11] = r.z; }
-        lineG.attributes.position.needsUpdate = true;
+        const r = ray(P.aim), dx = Math.sin(P.aim), dz = Math.cos(P.aim);
+        setSeg(gAim, cue.x + dx * R, cue.z + dz * R, r.x, r.z, 0.007);
+        if (r.hit) {
+          const ux = (r.hit.x - r.x) / (2 * R), uz = (r.hit.z - r.z) / (2 * R), along = dx * ux + dz * uz;
+          setSeg(gObj, r.hit.x + ux * R, r.hit.z + uz * R, r.hit.x + ux * (R + 0.18 + 0.5 * along), r.hit.z + uz * (R + 0.18 + 0.5 * along), 0.009);
+          const tx = dx - ux * along, tz = dz - uz * along, tl = Math.hypot(tx, tz);
+          if (tl > 0.08) setSeg(gCue, r.x, r.z, r.x + tx / tl * (0.12 + 0.3 * tl), r.z + tz / tl * (0.12 + 0.3 * tl), 0.006);
+          ghost.visible = true; ghost.position.set(r.x, top + 0.004, r.z);
+        }
+        mark.visible = P.phase === 'aim'; mark.position.x = P.tx; mark.position.z = P.tz;
       }
       if (!mineTurn && (P.phase === 'think' || (P.phase === 'roll' && P.strike > -0.5)) && cue.on) { const a = P.plan ? P.plan.aim : P.aim, [sx, sz] = P.phase === 'think' ? stance(a) : [her.x, her.z]; walkHer(sx, sz, a, 'shoot', dt); }
       else walkHer(P.watch[0], P.watch[1], P.watch[2], 'watch', dt);
-      // camera: behind the cue while you aim, a view of the whole table otherwise
-      const o = host.origin, tall = camera.aspect < 1.15;
-      if (mineTurn && (P.phase === 'aim' || P.phase === 'power') && cue.on) {
-        const dx = Math.sin(P.aim), dz = Math.cos(P.aim), back = tall ? 1.5 : 1.2;
-        camTo.set(cue.x - dx * back, top + (tall ? 0.8 : 0.58), cue.z - dz * back); lookTo.set(cue.x + dx * 0.6, top, cue.z + dz * 0.6);
-      } else if (tall) { camTo.set(2.7, top + 1.85, 0); lookTo.set(-0.15, top, 0); }
-      else { camTo.set(0, top + 1.5, 1.95); lookTo.set(0, top, 0.02); }
-      const b = host.bounds; camTo.x = clamp(camTo.x, b.x0, b.x1); camTo.z = clamp(camTo.z, b.z0, b.z1);
-      camTo.x += o.x; camTo.y += o.y; camTo.z += o.z; lookTo.x += o.x; lookTo.y += o.y; lookTo.z += o.z;
-      if (P.snap) { camera.position.copy(camTo); lookNow.copy(lookTo); P.snap = false; }
-      else { camera.position.lerp(camTo, Math.min(1, dt * (mineTurn && P.phase !== 'roll' ? 9 : 3.5))); lookNow.lerp(lookTo, Math.min(1, dt * (mineTurn && P.phase !== 'roll' ? 12 : 4))); }
-      camera.lookAt(lookNow);
+      // camera: straight down on the table, fitted to the screen (turned lengthways on a tall phone)
+      { const o = host.origin, tall = camera.aspect < 1; P.tall = tall;
+        const need = Math.max(tall ? 1.9 : 1.06, (tall ? 0.84 : 1.56) / camera.aspect), t = Math.max(0.36, need / 2.5), fov = 2 * Math.atan(t) * 180 / Math.PI;
+        if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+        camera.up.set(tall ? 1 : 0, 0, tall ? 0 : -1); camera.position.set(o.x, o.y + top + need / t, o.z); camera.lookAt(o.x, o.y + top, o.z); }
       // HUD
-      const tag = w => { const g = P.groups[w]; return P.open ? 'open table' : left(g) ? `${NAME[g]} · ${left(g)} left` : 'on the 8'; };
-      let html = `<div class="g-top"><div class="pill"${mineTurn && P.phase !== 'over' ? ' style="border-color:#f2b441"' : ''}>You: ${tag('you')}</div><div class="pill">8-ball</div><div class="pill"${!mineTurn && P.phase !== 'over' ? ' style="border-color:#f2b441"' : ''}>Bartender: ${tag('her')}</div></div>`;
-      if (P.msgT > 0) html += `<div class="g-msg" style="top:17%">${P.msg}</div>`;
-      if (P.phase === 'over') html += `<div class="g-prompt">${host.touch ? 'RACK — play again · ✕ to walk away' : 'Click to rack them again · <kbd>E</kbd> to walk away'}</div>`;
-      else if (mineTurn && (P.phase === 'aim' || P.phase === 'power')) html += `<div class="g-bar golf"><i style="width:${Math.round(P.power * 100)}%"></i><em>POWER</em></div><div class="g-tip">${host.touch ? 'Drag to aim · hold SHOOT for power, let go to shoot' : P.phase === 'power' ? 'Let go to shoot' : 'Mouse or A/D to aim · hold click for power, release to shoot · E walks away'}</div>`;
-      else if (!mineTurn && P.phase === 'think') html += `<div class="g-prompt" style="top:auto;bottom:84px">The bartender is lining one up…</div>`;
+      const chip = n => { const col = COLORS[n > 8 ? n - 8 : n]; return `<i style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-left:4px;vertical-align:-1px;box-sizing:border-box;${n > 8 ? `background:#f6f3ea;border:3px solid ${col}` : `background:${col};border:1px solid rgba(255,255,255,.35)`}"></i>`; };
+      const tag = w => { const g = P.groups[w]; if (P.open) return 'open table'; const mine = balls.filter(b => b.on && typeOf(b.n) === g); return mine.length ? `${NAME[g]}${mine.map(b => chip(b.n)).join('')}` : `on the 8${chip(8)}`; };
+      const lit = ' style="border-color:#f2b441;box-shadow:0 0 0 1px #f2b441"';
+      let html = `<div class="g-top"><div class="pill"${mineTurn && P.phase !== 'over' ? lit : ''}>You: ${tag('you')}</div><div class="pill"${!mineTurn && P.phase !== 'over' ? lit : ''}>Bartender: ${tag('her')}</div></div>`;
+      if (P.msgT > 0) html += `<div class="g-msg" style="top:13%;font-size:26px">${P.msg}</div>`;
+      if (P.phase === 'over') html += `<div class="g-prompt" style="top:auto;bottom:70px">${host.touch ? 'RACK — play again · ✕ to walk away' : 'Click to rack them again · <kbd>E</kbd> to walk away'}</div>`;
+      else if (mineTurn && P.phase === 'place') html += `<div class="g-prompt" style="top:auto;bottom:70px">${host.touch ? 'Ball in hand — drag to move the cue ball, then PLACE' : 'Ball in hand — move the mouse to position the cue ball, click to set it down'}</div>`;
+      else if (mineTurn && (P.phase === 'aim' || P.phase === 'power')) html += `<div class="g-bar golf" style="${host.touch ? 'top:58px;bottom:auto' : 'bottom:46px'}"><i style="width:${Math.round(P.power * 100)}%"></i><em>POWER</em></div><div class="g-tip">${host.touch ? 'Drag to aim · hold SHOOT for power, let go to shoot' : P.phase === 'power' ? 'Let go to shoot' : 'Move the mouse to aim (A/D to fine-tune) · hold click for power, release to shoot · E walks away'}</div>`;
+      else if (!mineTurn && P.phase === 'think') html += `<div class="g-prompt" style="top:auto;bottom:70px">The bartender is lining one up…</div>`;
       return html;
     },
   };
-  rack(); stick.visible = line.visible = ghost.visible = false;
+  rack(); hideGuides(); stick.visible = false;
   return api;
 }
