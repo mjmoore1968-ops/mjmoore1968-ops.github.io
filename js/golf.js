@@ -1,3 +1,5 @@
+import { createPool } from './pool.js';
+
 // Story St.: the outside world. The apartment building (No. 7), Lucky's bar, the golf club, a cart that drifts,
 // and three signature holes over rolling hills.
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -298,7 +300,7 @@ export function createGolf(THREE, ctx) {
 
   /* ---------------------------------------------------------------- inside Lucky's (a sealed room under the lawn) */
   const barG = new THREE.Group(); barG.position.set(BAR.x, BAR.y, BAR.z); scene.add(barG);
-  const tender = new THREE.Group(), tArm = new THREE.Group(), tHead = new THREE.Group();
+  const tender = new THREE.Group(), tArm = new THREE.Group(), tHead = new THREE.Group(); let poolTable = null, tRag = null, tCue = null;
   { const HW = BAR.hw, HD = BAR.hd, CE = 3.8, wood = 0x3b2414, dark = 0x2e1d12, green = 0x14432a, wall = 0x27463a, brass = 0xc9a24a;
     const floorT = canvasTex(512, 512, (c, W, H) => { const r = mulberry(5); for (let y = 0; y < 8; y++) for (let x = -1; x < 3; x++) { const v = 70 + r() * 34; c.fillStyle = `rgb(${v + 38 | 0},${v | 0},${v * 0.55 | 0})`; c.fillRect(x * 256 + (y % 2) * 128, y * 64, 254, 62); } c.fillStyle = 'rgba(0,0,0,.35)'; for (let y = 0; y < 8; y++) c.fillRect(0, y * 64 + 62, W, 2); });
     floorT.wrapS = floorT.wrapT = THREE.RepeatWrapping; floorT.repeat.set(4, 3);
@@ -337,8 +339,7 @@ export function createGolf(THREE, ctx) {
     { const P = new THREE.Group(); P.position.set(-4.3, 0, 2.6); barG.add(P);
       bx(P, 2.7, 0.28, 1.5, wood, 0, 0.78, 0); bx(P, 2.36, 0.03, 1.16, 0x1f7a45, 0, 0.925, 0);
       for (const k of [-1, 1]) { bx(P, 2.7, 0.07, 0.17, 0x4a2f1c, 0, 0.955, k * 0.665); bx(P, 0.17, 0.07, 1.5, 0x4a2f1c, k * 1.265, 0.955, 0); for (const j of [-1, 1]) bx(P, 0.16, 0.66, 0.16, dark, k * 1.15, 0.33, j * 0.55); }
-      [[0.5, 0.1, 0xf2b441], [0.62, 0.02, 0x2b5fa8], [0.62, 0.18, 0xd64545], [0.74, -0.06, 0x7a2e8a], [0.74, 0.1, 0x111111], [0.74, 0.26, 0xe07a1f], [-0.7, 0.05, 0xffffff], [-0.1, -0.35, 0x2f7d4a]].forEach(([x, z, c]) => sph(P, 0.045, c, x, 0.985, z));
-      cyl(P, 0.012, 0.018, 1.7, 0xd8b98a, -0.2, 1.0, 0.42, 6).rotation.set(0, 0, Math.PI / 2 - 0.02);
+      poolTable = P;
       cyl(P, 0.012, 0.012, 1.1, 0x222222, 0, CE - 0.55, 0, 6); bx(P, 1.5, 0.2, 0.6, green, 0, 2.6, 0); bx(P, 1.3, 0.03, 0.44, glow(0xffe9b8), 0, 2.49, 0); }
     // high-top tables
     for (const [x, z] of [[3.4, 3.4], [6.0, 1.0]]) { cyl(barG, 0.46, 0.46, 0.05, 0x7a4a26, x, 1.06, z, 20); cyl(barG, 0.045, 0.045, 1.04, 0x555555, x, 0.52, z, 8); cyl(barG, 0.3, 0.32, 0.04, 0x555555, x, 0.02, z, 16);
@@ -355,24 +356,74 @@ export function createGolf(THREE, ctx) {
     const ex = add(new THREE.PlaneGeometry(0.62, 0.24), new THREE.MeshBasicMaterial({ map: canvasTex(128, 48, (c, W, H) => { c.fillStyle = '#b8201a'; c.fillRect(0, 0, W, H); c.fillStyle = '#fff'; c.font = 'bold 34px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('EXIT', W / 2, H / 2 + 2); }) }), 0, 2.85, HD - 0.12, barG); ex.rotation.y = Math.PI;
     for (const k of [-1, 1]) { bx(barG, 4.2, 2.1, 0.06, glow(0xbfe0f7), k * 4.6, 1.95, HD - 0.03); for (const y of [0.86, 3.04]) bx(barG, 4.5, 0.14, 0.14, green, k * 4.6, y, HD - 0.08); for (const x of [-2.18, 0, 2.18]) bx(barG, 0.12, 2.2, 0.14, green, k * 4.6 + x, 1.95, HD - 0.08); }
     // the bartender
-    const skin = L(0xf1c7a3), topM = L(0x16181c), jean = L(0x2f4a78), hair = L(0xf4d875);
-    tender.position.set(-1.2, 0, -3.2); tender.scale.setScalar(0.97); barG.add(tender);
-    for (const k of [-1, 1]) bx(tender, 0.15, 0.86, 0.17, jean, k * 0.1, 0.43, 0);
-    cyl(tender, 0.17, 0.2, 0.2, jean, 0, 0.94, 0, 14); cyl(tender, 0.19, 0.145, 0.42, topM, 0, 1.24, 0, 14); cyl(tender, 0.15, 0.19, 0.07, skin, 0, 1.475, 0, 14);
-    for (const k of [-1, 1]) { const b2 = sph(tender, 0.1, topM, k * 0.088, 1.335, 0.11); b2.scale.set(1, 0.95, 0.95); sph(tender, 0.065, skin, k * 0.215, 1.45, 0); bx(tender, 0.035, 0.1, 0.03, topM, k * 0.13, 1.5, 0.02); }
-    cyl(tender, 0.045, 0.05, 0.12, skin, 0, 1.56, 0, 10);
-    tHead.position.set(0, 1.7, 0); tender.add(tHead);
-    sph(tHead, 0.115, skin, 0, 0, 0).scale.set(0.95, 1.08, 1);
-    for (const k of [-1, 1]) { sph(tHead, 0.017, 0x2a5a8a, k * 0.042, 0.015, 0.104); bx(tHead, 0.045, 0.008, 0.01, 0x8a6a2a, k * 0.042, 0.05, 0.106); }
-    bx(tHead, 0.055, 0.016, 0.02, 0xc4455a, 0, -0.052, 0.1);
-    const cap = add(new THREE.SphereGeometry(0.128, 18, 12, 0, 6.2832, 0, Math.PI * 0.56), hair, 0, 0.012, -0.012, tHead); cap.rotation.x = -0.42;
-    bx(tHead, 0.25, 0.52, 0.09, hair, 0, -0.2, -0.085); for (const k of [-1, 1]) { const lk = cyl(tHead, 0.04, 0.028, 0.46, hair, k * 0.118, -0.2, 0.015, 8); lk.rotation.z = k * 0.06; }
-    tArm.position.set(-0.215, 1.45, 0); tArm.rotation.x = -1.1; tender.add(tArm);                                   // wiping the bar down
-    cyl(tArm, 0.038, 0.032, 0.54, skin, 0, -0.27, 0, 8); sph(tArm, 0.045, skin, 0, -0.56, 0); bx(tArm, 0.18, 0.03, 0.14, 0xf4f1ea, 0, -0.6, 0);
-    const a2 = cyl(tender, 0.038, 0.032, 0.48, skin, 0.27, 1.22, 0, 8); a2.rotation.z = 0.2; sph(tender, 0.045, skin, 0.32, 0.98, 0.02);
+    const skin = L(0xf3c9a5), skin2 = L(0xe6b48e), topM = L(0x17191d), jean = L(0x33507f), hairA = L(0xf6dc7c), hairB = L(0xe7c655), gold = L(0xe2b84a), lipM = L(0xc9475c), white = L(0xffffff);
+    const tor = (parent, r, t, c, x, y, z) => add(new THREE.TorusGeometry(r, t, 6, 20), c, x, y, z, parent);
+    tender.rotation.order = 'YXZ'; tender.position.set(-1.2, 0, -3.2); tender.scale.setScalar(0.97); barG.add(tender);
+    for (const k of [-1, 1]) {                                                                                       // legs and boots
+      cyl(tender, 0.088, 0.068, 0.44, jean, k * 0.095, 0.7, 0, 10); cyl(tender, 0.066, 0.05, 0.42, jean, k * 0.095, 0.29, 0, 10);
+      bx(tender, 0.1, 0.1, 0.25, 0x3a2416, k * 0.095, 0.05, 0.035); bx(tender, 0.1, 0.03, 0.08, 0x24160d, k * 0.095, 0.015, -0.06);
+    }
+    sph(tender, 0.19, jean, 0, 0.94, -0.01).scale.set(1, 0.6, 0.82);                                                 // hips
+    cyl(tender, 0.158, 0.172, 0.045, 0x5b3a22, 0, 1.035, 0, 16).scale.z = 0.82; bx(tender, 0.05, 0.04, 0.02, gold, 0, 1.035, 0.142);   // belt and buckle
+    bx(tender, 0.3, 0.3, 0.018, 0x14432a, 0, 0.86, 0.15); bx(tender, 0.16, 0.1, 0.01, 0x0f3320, 0, 0.83, 0.162); bx(tender, 0.32, 0.03, 0.02, 0x0f3320, 0, 1.0, 0.151);   // short apron
+    cyl(tender, 0.15, 0.158, 0.14, topM, 0, 1.12, 0, 16).scale.z = 0.8; cyl(tender, 0.186, 0.15, 0.24, topM, 0, 1.3, 0, 16).scale.z = 0.8;    // waist, ribs
+    cyl(tender, 0.16, 0.186, 0.07, skin, 0, 1.455, 0, 16).scale.z = 0.8;
+    for (const k of [-1, 1]) { sph(tender, 0.1, topM, k * 0.088, 1.335, 0.1).scale.set(1, 0.95, 0.95); sph(tender, 0.062, skin, k * 0.215, 1.45, 0); }
+    cyl(tender, 0.043, 0.05, 0.12, skin, 0, 1.55, 0, 10);
+    tor(tender, 0.056, 0.003, gold, 0, 1.497, 0.028).rotation.x = Math.PI / 2 - 0.42; sph(tender, 0.011, 0x2fae5c, 0, 1.47, 0.082);                 // necklace with a clover-green stone
+    // head: face, then a lot of hair
+    tHead.position.set(0, 1.715, 0); tender.add(tHead);
+    sph(tHead, 0.112, skin, 0, 0, 0).scale.set(0.93, 1.1, 1);
+    cyl(tHead, 0.005, 0.013, 0.04, skin, 0, -0.01, 0.112, 8).rotation.x = -0.42; sph(tHead, 0.012, skin, 0, -0.027, 0.113).scale.set(1.15, 0.7, 0.7);
+    for (const k of [-1, 1]) {
+      sph(tHead, 0.021, white, k * 0.043, 0.018, 0.093).scale.set(1.15, 0.78, 0.5); sph(tHead, 0.0115, 0x3a86cc, k * 0.043, 0.017, 0.1015).scale.z = 0.5; sph(tHead, 0.006, 0x111111, k * 0.043, 0.017, 0.1055).scale.z = 0.5;
+      sph(tHead, 0.003, glow(0xffffff), k * 0.043 + 0.004, 0.022, 0.108);                                                                // a catchlight
+      const lash = bx(tHead, 0.04, 0.0045, 0.008, 0x3a2a1c, k * 0.0435, 0.0335, 0.1015); lash.rotation.z = -k * 0.03;
+      const brow = bx(tHead, 0.048, 0.007, 0.012, 0xa9853a, k * 0.045, 0.064, 0.1); brow.rotation.z = -k * 0.03;
+      sph(tHead, 0.024, 0xf2a898, k * 0.066, -0.024, 0.082).scale.set(1, 0.7, 0.35);                                                      // blush
+      sph(tHead, 0.02, skin, k * 0.103, 0.0, 0.0).scale.set(0.5, 1, 0.8); tor(tHead, 0.017, 0.0035, gold, k * 0.108, -0.04, 0.0).rotation.y = Math.PI / 2;   // ear and hoop
+    }
+    bx(tHead, 0.042, 0.009, 0.014, lipM, 0, -0.054, 0.1035); sph(tHead, 0.016, lipM, 0, -0.063, 0.099).scale.set(1.25, 0.45, 0.55);                                                          // the corners of a smile
+    const cap = add(new THREE.SphereGeometry(0.128, 18, 12, 0, 6.2832, 0, Math.PI * 0.56), hairA, 0, 0.012, -0.012, tHead); cap.rotation.x = -0.42;
+    sph(tHead, 0.13, hairA, 0, -0.01, -0.05).scale.set(1.03, 1.08, 0.9);
+    bx(tHead, 0.25, 0.5, 0.07, hairB, 0, -0.24, -0.1);
+    for (let i = -3; i <= 3; i++) cyl(tHead, 0.03, 0.02, 0.5 + (i % 2 ? 0.06 : 0), i % 2 ? hairA : hairB, i * 0.037, -0.27, -0.125 + Math.abs(i) * 0.012, 8);   // long waves down her back
+    for (const k of [-1, 1]) {
+      cyl(tHead, 0.036, 0.024, 0.5, hairA, k * 0.128, -0.22, -0.03, 8).rotation.z = k * 0.07; cyl(tHead, 0.022, 0.015, 0.42, hairB, k * 0.13, -0.2, 0.02, 8).rotation.set(0.1, 0, k * 0.12);
+      sph(tHead, 0.028, hairA, k * 0.15, -0.46, -0.01).scale.set(1, 1.3, 1);                                                             // curled ends
+    }
+    { const b1 = sph(tHead, 0.07, hairA, -0.04, 0.085, 0.07); b1.scale.set(1.35, 0.5, 0.62); b1.rotation.z = 0.38; const b2 = sph(tHead, 0.06, hairB, 0.062, 0.075, 0.066); b2.scale.set(1, 0.5, 0.62); b2.rotation.z = -0.55; }   // side-swept fringe
+    // arms: one works the bar, one sits on her hip
+    tArm.position.set(-0.215, 1.45, 0); tArm.rotation.x = -1.1; tender.add(tArm);
+    cyl(tArm, 0.04, 0.035, 0.28, skin, 0, -0.14, 0, 10); sph(tArm, 0.036, skin, 0, -0.28, 0); cyl(tArm, 0.034, 0.027, 0.27, skin, 0, -0.415, 0, 10);
+    sph(tArm, 0.04, skin, 0, -0.575, 0).scale.set(1, 1.2, 0.65); sph(tArm, 0.014, skin, 0.034, -0.56, 0.01); tor(tArm, 0.03, 0.005, gold, 0, -0.52, 0).rotation.x = Math.PI / 2;
+    tRag = bx(tArm, 0.18, 0.03, 0.14, 0xf4f1ea, 0, -0.62, 0);
+    { const up = new THREE.Group(); up.position.set(0.215, 1.45, 0); up.rotation.z = 0.55; tender.add(up);
+      cyl(up, 0.04, 0.035, 0.28, skin, 0, -0.14, 0, 10); sph(up, 0.036, skin, 0, -0.28, 0);
+      const lo = new THREE.Group(); lo.position.set(0, -0.28, 0); lo.rotation.z = -1.5; up.add(lo);
+      cyl(lo, 0.034, 0.027, 0.26, skin, 0, -0.13, 0, 10); sph(lo, 0.04, skin, 0, -0.28, 0).scale.set(1, 1.2, 0.65); tor(lo, 0.029, 0.004, gold, 0, -0.22, 0).rotation.x = Math.PI / 2; }
+    tCue = cyl(tender, 0.006, 0.013, 1.45, 0xd8b98a, -0.34, 0.74, 0.16, 8); tCue.visible = false;                                         // her cue, when she is waiting at the pool table
   }
   const barBlocked = (x, z) => Math.abs(x) > BAR.hw - 0.4 || Math.abs(z) > BAR.hd - 0.4 || (x < 4.75 && z < -0.9) || z < -3.5
     || (Math.abs(x + 4.3) < 1.75 && Math.abs(z - 2.6) < 1.15) || Math.hypot(x - 3.4, z - 3.4) < 0.8 || Math.hypot(x - 6.0, z - 1.0) < 0.8;
+  const TENDER_HOME = [-1.2, -3.2];
+  // the pool game moves her around: x,z in table space, pose 'shoot' | 'watch'
+  function poseTender(x, z, ry, pose, snap) {
+    tender.position.x = clamp(-4.3 + x, -BAR.hw + 0.45, BAR.hw - 0.45); tender.position.z = clamp(2.6 + z, -BAR.hd + 0.45, BAR.hd - 0.45); if (snap) tender.rotation.y = ry;
+    const sh = pose === 'shoot'; tender.rotation.y += wrap(ry - tender.rotation.y) * 0.25; tender.rotation.x += ((sh ? 0.34 : 0) - tender.rotation.x) * 0.2;
+    tArm.rotation.x += ((sh ? -1.25 : -0.12) - tArm.rotation.x) * 0.2; tArm.rotation.z = sh ? 0.2 : 0; tHead.rotation.y = 0; tHead.rotation.x = sh ? -0.25 : 0;
+    tRag.visible = false; tCue.visible = !sh;
+  }
+  function tenderHome() { tender.position.set(TENDER_HOME[0], 0, TENDER_HOME[1]); tender.rotation.set(0, 0, 0); tArm.rotation.set(-1.1, 0, 0); tHead.rotation.set(0, 0, 0); tRag.visible = true; tCue.visible = false; }
+  const pool = createPool(THREE, { group: poolTable, top: 0.94, origin: { x: BAR.x - 4.3, y: BAR.y, z: BAR.z + 2.6 }, camera, touch: ctx.touch, tender: poseTender, line: t => { S.line = t; S.lineT = 3.6; },
+    bounds: { x0: -BAR.hw + 0.25 + 4.3, x1: BAR.hw - 0.25 + 4.3, z0: -BAR.hd + 0.25 - 2.6, z1: BAR.hd - 0.25 - 2.6 } });
+  function enterPool() { ctx.fade?.(); S.state = 'pool'; S.lineT = 0; pool.start(); }
+  function leavePool() { ctx.fade?.(); pool.stop(); tenderHome(); S.state = 'bar'; S.bx = -2.25; S.bz = 2.6; S.yaw = Math.PI / 2; S.pitch = -0.15; S.lineT = 0; }
+  function updatePool(dt, s) {
+    let html = pool.update(dt, s); S.lineT -= dt; tender.position.y = Math.sin(S.t * 1.7) * 0.004;
+    if (S.lineT > 0) html += `<div class="g-prompt" style="top:27%">Bartender: ${S.line}</div>`;
+    ctx.hud(html);
+  }
   const LINES = ['“First one’s on the house.”', '“Cold one, coming up.”', '“How did the Volcano treat you?”', '“Same again?”', '“Nobody drives the cart after this one.”', '“They say it brings luck on the Island hole.”', '“You live at number 7, right?”'];
   function setBar(on) { hemi.intensity = on ? 0.42 : 1.7; sun.intensity = on ? 0 : 1.9; }
   function enterBar() { ctx.fade?.(); setBar(true); S.state = 'bar'; S.bx = 0; S.bz = BAR.hd - 1.3; S.yaw = 0; S.pitch = 0; S.lineT = 0; mapEl.classList.add('hidden'); }
@@ -386,6 +437,7 @@ export function createGolf(THREE, ctx) {
     }
     camera.position.set(BAR.x + S.bx, BAR.y + 1.68, BAR.z + S.bz); camera.rotation.set(S.pitch, S.yaw, 0);
     if (Math.hypot(S.bx, S.bz - BAR.hd) < 1.9) S.prompt = { k: 'out', t: 'Back out to Story St.' };
+    else if (Math.abs(S.bx + 4.3) < 2.45 && Math.abs(S.bz - 2.6) < 1.85) S.prompt = { k: 'pool', t: 'Play 8-ball against the bartender' };
     else if (Math.hypot(S.bx + 1.2, S.bz + 0.9) < 2.6) S.prompt = { k: 'tender', t: 'Order a beer' };
     // she wipes the bar and keeps an eye on you
     const want = clamp(Math.atan2(S.bx - tender.position.x, S.bz - tender.position.z), -0.7, 0.7);
@@ -601,7 +653,8 @@ export function createGolf(THREE, ctx) {
   }
   // fromClick: a mouse click only acts on things you are standing next to; skipping ahead needs E
   function use(fromClick) {
-    if (S.state === 'bar') { if (S.prompt?.k === 'out') leaveBar(); else if (S.prompt?.k === 'tender') orderBeer(); return; }
+    if (S.state === 'pool') { leavePool(); return; }
+    if (S.state === 'bar') { if (S.prompt?.k === 'out') leaveBar(); else if (S.prompt?.k === 'pool') enterPool(); else if (S.prompt?.k === 'tender') orderBeer(); return; }
     if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; return; }
     if (S.state === 'landed') { if (!S.done) goNext(); return; }
     if (S.state === 'cart') { exitCart(); if (!S.done && Math.hypot(S.ball.x - S.px, S.ball.z - S.pz) < 9) { standBy(); address(); } return; }
@@ -677,26 +730,30 @@ export function createGolf(THREE, ctx) {
 
   const api = {
     scene, camera, S, cart,
-    get label() { return S.state === 'address' ? (S.phase === 'acc' ? 'STOP' : 'SWING') : S.state === 'cart' ? 'EXIT' : S.state === 'landed' ? 'NEXT' : 'USE'; },
-    get canBack() { return S.state === 'address'; },
-    back() { if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; } },
+    get pool() { return pool; },
+    get label() { return S.state === 'pool' ? pool.label : S.state === 'address' ? (S.phase === 'acc' ? 'STOP' : 'SWING') : S.state === 'cart' ? 'EXIT' : S.state === 'landed' ? 'NEXT' : 'USE'; },
+    get canBack() { return S.state === 'address' || S.state === 'pool'; },
+    back() { if (S.state === 'pool') leavePool(); else if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; } },
     use, reset,
     // test hook: play a shot with a given power (0..1) and accuracy (-1..1, 0 = straight)
     hit(p, dev = 0) { if (S.state === 'address') { S.power = clamp(p, 0, 1); swing(dev); } },
     enter() { setBar(false); S.state = 'foot'; S.px = APT.x; S.pz = APT.z + APT.d / 2 + 4.8; S.yaw = -2.2; S.pitch = 0; mapEl.classList.remove('hidden');   // out of your front door, looking down the street to the club
       say('Story St.', S.led ? '' : 'The cart outside the golf club will take you to the first tee.', 3.5); },
-    leave() { setBar(false); if (S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; } mapEl.classList.add('hidden'); },
+    leave() { setBar(false); if (S.state === 'pool') { pool.stop(); tenderHome(); S.state = 'bar'; } if (S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; } mapEl.classList.add('hidden'); },
     look(dx, dy) {
+      if (S.state === 'pool') { pool.look(dx); return; }
       if (S.state === 'address') { if (S.phase !== 'acc') S.aim -= dx * 0.0011; return; }
       if (S.state === 'foot' || S.state === 'bar') { S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.3, 1.3); }
     },
     down(src) {
+      if (S.state === 'pool') { pool.down(); return; }
       if (S.state === 'address') {
         if (S.phase === 'aim') { S.phase = 'power'; S.cT = 0; S.power = 0; }
         else if (S.phase === 'acc' && S.accT > 0.12) swing(accPos());
       } else if (src !== 'key') use(src !== 'btn');
     },
     up() {
+      if (S.state === 'pool') { pool.up(); return; }
       if (S.state !== 'address' || S.phase !== 'power') return;
       if (S.cT > 0.06) { S.phase = 'acc'; S.accT = 0; } else S.phase = 'aim';      // power is locked in; now stop the accuracy line
     },
@@ -706,6 +763,7 @@ export function createGolf(THREE, ctx) {
       S.prompt = null;
       if (camera.fov !== 68 && S.state !== 'cart') { camera.fov = 68; camera.updateProjectionMatrix(); }
       if (S.state === 'bar') { updateBar(dt, f, s); return; }
+      if (S.state === 'pool') { updatePool(dt, s); return; }
       if (S.state === 'landed' && (Math.abs(f) > 0.3 || Math.abs(s) > 0.3)) S.state = 'foot';        // walk off instead of skipping ahead
       if (S.state === 'foot') {
         if (f || s) {

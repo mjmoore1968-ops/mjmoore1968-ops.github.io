@@ -411,7 +411,7 @@ function tombstone(parent, name, x, y, z, s) {
   col(37.2, 5.62, 0.5, 0.6);
   interact(mb, 'Send me a message', openEmail);
 
-  /* --- front door to outside: locked until the key is found (the key comes later) --- */
+  /* --- front door to outside --- */
   const fd = group(44.6, 0, 5.94);
   box(fd, 1.0, 2.1, 0.08, 0x7a2e2a, 0, 1.05, 0);
   for (const [px, py] of [[-0.22, 1.55], [0.22, 1.55], [-0.22, 0.95], [0.22, 0.95], [-0.22, 0.38], [0.22, 0.38]]) box(fd, 0.34, py > 0.5 ? 0.46 : 0.5, 0.03, 0x8c3a35, px, py, -0.045);
@@ -420,7 +420,7 @@ function tombstone(parent, name, x, y, z, s) {
   box(fd, 0.08, 2.2, 0.1, 0xf5f1e8, -0.54, 1.1, 0); box(fd, 0.08, 2.2, 0.1, 0xf5f1e8, 0.54, 1.1, 0); box(fd, 1.16, 0.08, 0.1, 0xf5f1e8, 0, 2.18, 0);
   box(fd, 0.9, 0.02, 0.5, 0x4a5a3a, 0, 0.01, -0.33);                                                                           // doormat
   plane(fd, 0.62, 0.2, sign('OUTSIDE', 0.62, 0.2, '#f5f1e8', '#3a3024', 'Georgia, serif', false), 0, 2.36, -0.06, Math.PI);
-  interact(fd, 'Front door', tryFrontDoor);
+  interact(fd, 'Go outside', tryFrontDoor);
 
   /* --- career: a suit on a hanger; takes you straight to LinkedIn --- */
   const suit = group(43.0, 0, 5.9);
@@ -600,7 +600,7 @@ function tombstone(parent, name, x, y, z, s) {
 const S = {
   mode: 'waking',           // waking | world | panel | game | blackout
   pos: new THREE.Vector3().copy(BED.lie), yaw: 0, pitch: 0, roll: 0,
-  drinks: 0, limit: 10, hasKey: false, t: 0, wakeT: 0, paused: false, target: null, bob: 0, seenLiving: false,
+  drinks: 0, limit: 10, t: 0, wakeT: 0, paused: false, target: null, bob: 0, seenLiving: false,
 };
 const keys = {};
 const stick = { f: 0, s: 0 };       // touch joystick
@@ -741,19 +741,10 @@ function openLink(url) {
   else unlock();
 }
 function openLinkedIn() { openLink(LINKS.linkedin); }
-function tryFrontDoor() {
-  if (!S.hasKey) { toast('🔒 Locked. Word is the key goes to whoever can score a lacrosse goal after five beers.', 4200); return; }
-  goOutside();
-}
+function tryFrontDoor() { goOutside(); }      // the front door is open to everyone
 
-/* ------------------------------------------------------------------ the key, and the world outside */
+/* ------------------------------------------------------------------ the world outside */
 let golf = null, panelFrom = 'world';
-function awardKey() {
-  if (S.hasKey) return;
-  S.hasKey = true; const k = $('key'); k.className = 'pop'; setTimeout(() => (k.className = 'dock'), 1800);
-  try { localStorage.setItem('mmjr.key', '1'); } catch { /* storage unavailable: the key lasts for this visit */ }
-  toast('🔑 You won the front door key!', 3600);
-}
 function fadeThrough(mid) {
   const b = $('black'); b.style.transition = 'opacity .35s ease'; b.style.opacity = 1;
   setTimeout(() => { mid(); b.style.opacity = 0; }, 380);
@@ -857,7 +848,6 @@ const ctx = {
   keys, axes, touch: TOUCH,
   hud(html) { if (html !== lastHud) { lastHud = html; $('ghud').innerHTML = html; } },
   finish(result) { showResult(activeName, result); },
-  onGoal() { if (!S.hasKey && S.drinks >= 4) awardKey(); },      // five beers, with a minute's grace as they wear off
 };
 function startGame(name, opt = {}) {
   disposeGame();
@@ -962,7 +952,7 @@ if (TOUCH) {
     .tCart.on{background:rgba(242,180,65,.92);color:#1a1303} #tTurbo{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tDrift{bottom:max(34px,env(safe-area-inset-bottom))}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
-    .g-wind{top:60px;left:12px;font-size:12px} #key.dock{top:calc(100% - 220px)} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px} .g-side.left{left:12px;right:auto;top:96px;bottom:auto;min-width:0}
+    .g-wind{top:60px;left:12px;font-size:12px} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px} .g-side.left{left:12px;right:auto;top:96px;bottom:auto;min-width:0}
     .g-acc{width:240px;bottom:150px} .g-bar.golf{bottom:186px} .g-clubs{bottom:216px} #gmap{top:8px;right:8px}
     .g-top{top:12px;max-width:96vw;flex-wrap:wrap;justify-content:center} .pill{font-size:12.5px;padding:6px 10px} .g-bar{bottom:150px;width:200px} .g-msg{font-size:22px;white-space:normal;width:86vw}
     .g-band{width:220px} #controls{white-space:normal;width:80vw}`;
@@ -1118,7 +1108,6 @@ showWorldHud(true);
 S.mode = 'world'; S.pos.copy(BED.stand); S.yaw = -Math.PI / 2 - 0.25; S.pitch = -0.05; S.roll = 0;
 S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
 // a key you already won on this device is still yours on later visits
-try { if (localStorage.getItem('mmjr.key') === '1') { S.hasKey = true; $('key').className = 'dock'; } } catch { /* ignore */ }
 requestAnimationFrame(frame);
 
-if (TEST) window.__g = { awardKey, goOutside, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
+if (TEST) window.__g = { goOutside, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
