@@ -1,4 +1,7 @@
 import { createPool } from './pool.js';
+import { createPong } from './pong.js';
+import { makePerson } from './people.js';
+import { chips } from './casino.js';
 
 // Story St.: the outside world. The apartment building (No. 7), Lucky's bar, the golf club, a cart that drifts,
 // and three signature holes over rolling hills.
@@ -36,6 +39,8 @@ const BOUNDS = { x0: -340, x1: 520, z0: -170, z1: 600 };
 const TX = { x0: -380, x1: 560, z0: -220, z1: 640 }; // terrain mesh extent
 const APT = { x: -38, z: -20, w: 12, d: 11 };          // the apartment building, No. 7 (front faces +z)
 const LKY = { x: -58, z: -20, w: 15, d: 11 };          // Lucky's bar, on the far side of the apartment from the club
+const CAS = { x: -81, z: -20, w: 18, d: 13 };          // the casino, on the far side of Lucky's
+const CIN = { x: -81, y: -80, z: -20, hw: 9, hd: 7 };  // and its gaming floor, sealed away like the bar
 const BAR = { x: -58, y: -80, z: -20, hw: 8, hd: 6 };  // Lucky's interior: a sealed room far below the lawn
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const COL = { rough: '#2c6a2b', fair: '#63b548', fair2: '#70c254', fringe: '#7fcb58', green: '#a6e56c', tee: '#58ad49', sand: '#f1e3ae', sandRim: '#cdbb84', ash: '#8f8983', ashRim: '#5f5a55', rock: '#5b4a3c', rock2: '#6f5a48', beach: '#e3d7a6', water: '#3d8fd6', bank: '#2a5c28', path: '#d6cdb6' };
@@ -91,7 +96,7 @@ export function createGolf(THREE, ctx) {
     h *= smooth(62, 135, Math.hypot(x, z + 10));
     return h * smooth(0, 50, Math.min(x - TX.x0, TX.x1 - x, z - TX.z0, TX.z1 - z));
   }
-  const flats = [{ x: -50, z: -18, r0: 36, r1: 54, h: 0, k: 0 }];      // level ground under the apartment and Lucky's
+  const flats = [{ x: -50, z: -18, r0: 50, r1: 68, h: 0, k: 0 }];      // level ground under the apartment and Lucky's
   function designH(x, z) {
     let h = rawH(x, z);
     for (const f of flats) { const dx = x - f.x, dz = z - f.z; if (Math.abs(dx) < f.r1 && Math.abs(dz) < f.r1) { const d = Math.hypot(dx, dz); if (d < f.r1) h = lerp(f.h + (h - f.h) * f.k, h, smooth(f.r0, f.r1, d)); } }
@@ -151,8 +156,9 @@ export function createGolf(THREE, ctx) {
       for (const b of bunkers) { circ(b.x, b.z, b.r + 0.6, b.ash ? COL.ashRim : COL.sandRim); circ(b.x, b.z, b.r - 0.2, b.ash ? COL.ash : COL.sand); }
       { const wb = bunkers.find(b => b.r > 15); if (wb) { const r3 = mulberry(3); for (let i = 0; i < 60; i++) { const a = r3() * 6.28, d = r3() * (wb.r - 2); circ(wb.x + Math.cos(a) * d, wb.z + Math.sin(a) * d, 0.5 + r3() * 1.4, r3() < 0.5 ? 'rgba(160,140,90,.35)' : 'rgba(255,255,255,.25)'); } } }   // ripples in the waste bunker
       c.fillStyle = COL.path; c.fillRect(X(-3), Z(-7), 6 * s, 26 * s); circ(6, 18, 9, COL.path);
-      c.fillRect(X(-68), Z(-11.6), 66 * s, 3.2 * s);                                               // the sidewalk along Story St.
-      for (const B of [APT, LKY]) c.fillRect(X(B.x - 1.6), Z(B.z + B.d / 2), 3.2 * s, 3.4 * s);
+      c.fillRect(X(-93), Z(-11.6), 91 * s, 3.2 * s);                                               // the sidewalk along Story St.
+      for (const B of [APT, LKY, CAS]) c.fillRect(X(B.x - 1.6), Z(B.z + B.d / 2), 3.2 * s, 3.4 * s);
+      c.fillStyle = '#8a1f2b'; c.fillRect(X(CAS.x - 1.3), Z(CAS.z + CAS.d / 2), 2.6 * s, 5 * s);                       // the casino's red carpet
     });
     map.anisotropy = 8;
     const pos = new Float32Array(NX * NZ * 3), uv = new Float32Array(NX * NZ * 2), idx = new Uint32Array((NX - 1) * (NZ - 1) * 6);
@@ -200,7 +206,7 @@ export function createGolf(THREE, ctx) {
   const trees = [];
   for (let i = 0; i < 2600 && trees.length < 430; i++) {
     const x = lerp(BOUNDS.x0 + 10, BOUNDS.x1 - 10, rng()), z = lerp(BOUNDS.z0 + 10, BOUNDS.z1 - 10, rng());
-    if (x > -98 && x < 60 && z > -48 && z < 40) continue;                  // keep the street and the first tee walk clear
+    if (x > -116 && x < 60 && z > -48 && z < 40) continue;                  // keep the street and the first tee walk clear
     if (ponds.some(p => Math.hypot(x - p.x, z - p.z) < p.r + 10)) continue;
     if (bunkers.some(b => Math.hypot(x - b.x, z - b.z) < b.r + 4)) continue;
     if (holes.some(h => (h.teeUp && Math.hypot(x - h.tee[0], z - h.tee[1]) < 30) || ((h.plateau || h.bowl) && Math.hypot(x - h.green[0], z - h.green[1]) < h.gr + 36))) continue;
@@ -343,7 +349,7 @@ export function createGolf(THREE, ctx) {
       poolLamp = new THREE.Group(); P.add(poolLamp);                                 // hidden while you play, so the overhead camera can see the cloth
       cyl(poolLamp, 0.012, 0.012, 1.1, 0x222222, 0, CE - 0.55, 0, 6); bx(poolLamp, 1.5, 0.2, 0.6, green, 0, 2.6, 0); bx(poolLamp, 1.3, 0.03, 0.44, glow(0xffe9b8), 0, 2.49, 0); }
     // high-top tables
-    for (const [x, z] of [[3.4, 3.4], [6.0, 1.0]]) { cyl(barG, 0.46, 0.46, 0.05, 0x7a4a26, x, 1.06, z, 20); cyl(barG, 0.045, 0.045, 1.04, 0x555555, x, 0.52, z, 8); cyl(barG, 0.3, 0.32, 0.04, 0x555555, x, 0.02, z, 16);
+    for (const [x, z] of [[3.4, 3.4]]) { cyl(barG, 0.46, 0.46, 0.05, 0x7a4a26, x, 1.06, z, 20); cyl(barG, 0.045, 0.045, 1.04, 0x555555, x, 0.52, z, 8); cyl(barG, 0.3, 0.32, 0.04, 0x555555, x, 0.02, z, 16);
       for (const k of [-1, 1]) { cyl(barG, 0.19, 0.19, 0.07, 0x7a1f1f, x + k * 0.8, 0.76, z + 0.15 * k, 14); cyl(barG, 0.028, 0.028, 0.74, 0x888888, x + k * 0.8, 0.38, z + 0.15 * k, 8); cyl(barG, 0.18, 0.2, 0.03, 0x555555, x + k * 0.8, 0.015, z + 0.15 * k, 14); }
       cyl(barG, 0.045, 0.038, 0.15, beer, x + 0.15, 1.16, z - 0.1, 10); }
     // jukebox, dartboard, neon clover, door and daylight windows
@@ -392,8 +398,152 @@ export function createGolf(THREE, ctx) {
       bx(ar, 0.1, 0.1, 0.11, topM, 0, -0.03, 0); bx(ar, 0.085, 0.5, 0.09, skin, 0, -0.32, 0); sph(ar, 0.05, skin, 0, -0.6, 0); }
     tCue = cyl(tender, 0.006, 0.013, 1.45, 0xd8b98a, -0.34, 0.74, 0.16, 8); tCue.visible = false;                                // her cue, when she is waiting at the pool table
   }
+  /* ---------------------------------------------------------------- beer pong (in Lucky's) and the casino */
+  const pongG = new THREE.Group(); pongG.position.set(5.6, 0, 1.6); barG.add(pongG);
+  const flannel = new THREE.MeshLambertMaterial({ map: canvasTex(128, 128, (c, W, H) => {
+    c.fillStyle = '#b3262a'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(20,16,18,.55)'; for (let i = 0; i < 4; i++) { c.fillRect(i * 32 + 4, 0, 12, H); c.fillRect(0, i * 32 + 4, W, 12); }
+    c.fillStyle = 'rgba(255,235,220,.35)'; for (let i = 0; i < 4; i++) { c.fillRect(i * 32 + 23, 0, 2, H); c.fillRect(0, i * 32 + 23, W, 2); } }) });
+  const patBar = makePerson(THREE, { top: flannel, shirt: 0xf6f3ec, legs: 0x3d5f93, hair: 0x5b3f2a, hairStyle: 'swept', shoes: 0x6b4a2f });
+  const pong = createPong(THREE, { group: pongG, camera, origin: { x: BAR.x + 5.6, y: BAR.y, z: BAR.z + 1.6 }, touch: ctx.touch, pat: patBar, drink: () => ctx.drink?.(), drinks: () => ctx.drinks?.() ?? 0,
+    line: t => { S.line = t; S.lineT = 3.2; S.lineWho = 'Pat'; } });
+  function enterPong() { ctx.fade?.(); S.state = 'pong'; S.lineT = 0; pong.start(); }
+  function leavePong() { ctx.fade?.(); pong.stop(); camera.fov = 68; camera.updateProjectionMatrix(); S.state = 'bar'; S.bx = 5.6; S.bz = 4.7; S.yaw = 0; S.pitch = -0.1; S.lineT = 0; }
+  function updatePong(dt, s) {
+    let html = pong.update(dt, s); S.lineT -= dt;
+    if (S.lineT > 0) html += `<div class="g-prompt" style="top:27%">${S.lineWho}: ${S.line}</div>`;
+    ctx.hud(html);
+  }
+
+  { // the casino from the street: cream stone, gold trim, a marquee and a red carpet
+    const K = new THREE.Group(); K.position.set(CAS.x, 0, CAS.z); scene.add(K);
+    const W = CAS.w, D = CAS.d, H = 7, fz = D / 2, gold = 0xd9b34a, cream = 0xe9e2d0, warm = glow(0xf6d98a);
+    bx(K, W, H, D, cream, 0, H / 2, 0); bx(K, W + 0.3, 0.7, D + 0.3, 0x17191d, 0, 0.35, 0); bx(K, W + 0.5, 0.35, D + 0.5, gold, 0, H + 0.17, 0); bx(K, W + 0.2, 0.6, D + 0.2, 0x17191d, 0, H + 0.65, 0);
+    for (const x of [-7.6, -3.2, 3.2, 7.6]) { cyl(K, 0.36, 0.4, 5.4, 0xf5f1e8, x, 2.7, fz + 0.5, 16); cyl(K, 0.48, 0.4, 0.25, gold, x, 5.5, fz + 0.5, 16); bx(K, 0.95, 0.25, 0.95, gold, x, 0.13, fz + 0.5); }
+    bx(K, W + 0.4, 0.7, 1.9, 0xf5f1e8, 0, 5.98, fz + 0.3);                                                             // the portico beam
+    for (const k of [-1, 1]) { bx(K, 2.6, 3.6, 0.1, warm, k * 5.4, 2.7, fz + 0.02); bx(K, 2.9, 0.16, 0.2, gold, k * 5.4, 4.58, fz + 0.05); bx(K, 2.9, 0.16, 0.2, gold, k * 5.4, 0.82, fz + 0.05); for (const j of [-1, 0, 1]) bx(K, 0.1, 3.7, 0.16, gold, k * 5.4 + j * 1.4, 2.7, fz + 0.05); }
+    bx(K, 3.4, 3.5, 0.16, gold, 0, 1.75, fz + 0.03); for (const k of [-1, 1]) { bx(K, 1.45, 3.2, 0.1, 0x3a0f16, k * 0.76, 1.62, fz + 0.1); bx(K, 0.9, 1.5, 0.04, warm, k * 0.76, 2.2, fz + 0.15); bx(K, 0.06, 0.7, 0.07, gold, k * 0.14, 1.5, fz + 0.18); }
+    const signT = canvasTex(1024, 256, (c, W2, H2) => {
+      c.fillStyle = '#3a0f16'; c.fillRect(0, 0, W2, H2); c.strokeStyle = '#d9b34a'; c.lineWidth = 10; c.strokeRect(10, 10, W2 - 20, H2 - 20);
+      c.shadowColor = '#ffd76a'; c.shadowBlur = 26; c.fillStyle = '#ffe9a8'; c.font = 'bold 150px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; for (let i = 0; i < 2; i++) c.fillText('CASINO', W2 / 2, H2 / 2 + 2);
+      c.shadowBlur = 8; c.font = 'bold 30px Georgia, serif'; c.fillText('★  STORY ST.  ★', W2 / 2, 222);
+      c.shadowBlur = 10; c.fillStyle = '#fff3c4'; for (let i = 0; i < 26; i++) { for (const y of [28, H2 - 28]) { c.beginPath(); c.arc(40 + i * 37.8, y, 6, 0, 6.3); c.fill(); } } });
+    bx(K, 10.4, 2.9, 0.4, 0x17191d, 0, H + 2.3, fz - 0.6); add(new THREE.PlaneGeometry(10, 2.5), new THREE.MeshBasicMaterial({ map: signT }), 0, H + 2.3, fz - 0.39, K);
+    for (const k of [-1, 1]) bx(K, 0.2, 1.2, 0.2, 0x17191d, k * 4.4, H + 0.9, fz - 0.6);
+    bx(K, 3.2, 0.14, 2.4, 0xb9b2a4, 0, 0.07, fz + 1.1);
+    for (const k of [-1, 1]) { for (const z of [1.2, 3.4]) { cyl(K, 0.05, 0.05, 1.0, gold, k * 1.6, 0.5, fz + z, 8); sph(K, 0.09, gold, k * 1.6, 1.02, fz + z); } bx(K, 0.05, 0.06, 2.2, 0x8a1f2b, k * 1.6, 0.86, fz + 2.3);    // velvet ropes
+      bx(K, 0.9, 0.7, 0.9, 0x17191d, k * 9.6, 0.35, fz + 1.2); sph(K, 0.6, 0x2c7a3a, k * 9.6, 1.15, fz + 1.2); }
+    sph(K, 2.2, gold, 0, H + 0.6, -1).scale.set(1, 0.55, 1);
+  }
+  const casG = new THREE.Group(); casG.position.set(CIN.x, CIN.y, CIN.z); scene.add(casG);
+  const casPeople = [];
+  { const HW = CIN.hw, HD = CIN.hd, CE = 4.3, gold = 0xd9b34a, wood = 0x3b2414, felt = 0x1c7a48, wine = 0x4a1420;
+    const carpet = canvasTex(256, 256, (c, W, H) => { c.fillStyle = '#7a1826'; c.fillRect(0, 0, W, H); c.fillStyle = '#8f2231'; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { c.beginPath(); c.moveTo(x * 64 + 32, y * 64 + 6); c.lineTo(x * 64 + 58, y * 64 + 32); c.lineTo(x * 64 + 32, y * 64 + 58); c.lineTo(x * 64 + 6, y * 64 + 32); c.fill(); } c.fillStyle = '#d9b34a'; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { c.beginPath(); c.arc(x * 64, y * 64, 4, 0, 6.3); c.fill(); c.fillRect(x * 64 + 30, y * 64 + 30, 4, 4); } });
+    carpet.wrapS = carpet.wrapT = THREE.RepeatWrapping; carpet.repeat.set(9, 7);
+    add(new THREE.PlaneGeometry(HW * 2, HD * 2), new THREE.MeshLambertMaterial({ map: carpet }), 0, 0, 0, casG).rotation.x = -Math.PI / 2;
+    bx(casG, HW * 2 + 0.4, 0.2, HD * 2 + 0.4, 0x1a1012, 0, CE + 0.1, 0);
+    for (const k of [-1, 1]) {
+      bx(casG, HW * 2 + 0.4, CE, 0.2, wine, 0, CE / 2, k * (HD + 0.1)); bx(casG, 0.2, CE, HD * 2 + 0.4, wine, k * (HW + 0.1), CE / 2, 0);
+      bx(casG, HW * 2, 1.0, 0.08, wood, 0, 0.5, k * (HD - 0.04)); bx(casG, 0.08, 1.0, HD * 2, wood, k * (HW - 0.04), 0.5, 0);
+      bx(casG, HW * 2, 0.07, 0.12, gold, 0, 1.04, k * (HD - 0.06)); bx(casG, 0.12, 0.07, HD * 2, gold, k * (HW - 0.06), 1.04, 0);
+      bx(casG, HW * 2, 0.12, 0.12, gold, 0, CE - 0.06, k * (HD - 0.06)); bx(casG, 0.12, 0.12, HD * 2, gold, k * (HW - 0.06), CE - 0.06, 0);
+      for (const z of [-3.5, 3.5]) { cyl(casG, 0.28, 0.3, CE, 0xf5f1e8, k * 3.6, CE / 2, z, 14); cyl(casG, 0.36, 0.3, 0.2, gold, k * 3.6, CE - 0.1, z, 14); cyl(casG, 0.3, 0.38, 0.2, gold, k * 3.6, 0.1, z, 14); }   // pillars
+    }
+    const pl = (c, i, x, y, z, d = 16) => { const l = new THREE.PointLight(c, i, d, 1.5); l.position.set(x, y, z); casG.add(l); };
+    for (const [x, z] of [[-5, -0.5], [0, 2.2], [5, -0.5]]) {                                                          // chandeliers
+      cyl(casG, 0.015, 0.015, 0.7, gold, x, CE - 0.35, z, 6); cyl(casG, 0.5, 0.3, 0.12, gold, x, CE - 0.76, z, 16);
+      for (let i = 0; i < 8; i++) sph(casG, 0.06, glow(0xffe9b8), x + Math.cos(i * 0.785) * 0.46, CE - 0.86, z + Math.sin(i * 0.785) * 0.46);
+      pl(0xffd9a0, 26, x, CE - 1.1, z);
+    }
+    const chipCols = [0xc0262d, 0x2456b8, 0x1f8a4c, 0x17191d, 0xf4f1ea];
+    const stackOf = (parent, x, y, z, n, c) => { for (let i = 0; i < n; i++) cyl(parent, 0.028, 0.028, 0.008, chipCols[(c + (i % 4 === 3 ? 4 : 0)) % 5], x, y + 0.004 + i * 0.0085, z, 12); };
+    const cardOn = (parent, x, y, z, ry, back) => { const m = bx(parent, 0.064, 0.002, 0.09, back ? 0x8a1f2b : 0xfbf8f0, x, y, z); m.rotation.y = ry; return m; };
+    const dealer = (x, z, o) => { const p = makePerson(THREE, { top: 0xf6f3ec, vest: 0x17191d, bowtie: 0xb8262d, legs: 0x17191d, ...o }); p.g.position.set(x, 0, z); casG.add(p.g); casPeople.push(p); return p; };
+    const stool = (x, z) => { cyl(casG, 0.2, 0.2, 0.08, 0x7a1f1f, x, 0.72, z, 14); cyl(casG, 0.03, 0.03, 0.68, gold, x, 0.36, z, 8); cyl(casG, 0.2, 0.22, 0.04, gold, x, 0.02, z, 14); };
+    { // blackjack: a half-moon of green felt
+      const T = new THREE.Group(); T.position.set(-5.2, 0, -1.7); casG.add(T);
+      add(new THREE.CylinderGeometry(1.55, 1.55, 0.12, 28, 1, false, -Math.PI / 2, Math.PI), L(wood), 0, 0.92, -0.45, T); add(new THREE.CylinderGeometry(1.42, 1.42, 0.125, 28, 1, false, -Math.PI / 2, Math.PI), L(felt), 0, 0.925, -0.45, T);
+      bx(T, 3.1, 0.12, 0.12, wood, 0, 0.92, -0.45); cyl(T, 0.5, 0.6, 0.86, wood, 0, 0.43, 0.15, 14).scale.z = 0.7;
+      for (let i = -2; i <= 2; i++) { const a = i * 0.5, x = Math.sin(a) * 1.02, z = -0.45 + Math.cos(a) * 1.02; const r = add(new THREE.RingGeometry(0.09, 0.105, 20), new THREE.MeshBasicMaterial({ color: 0xf4e7b0, side: THREE.DoubleSide }), x, 0.99, z, T); r.rotation.x = -Math.PI / 2; }
+      cardOn(T, -0.08, 0.99, -0.2, 0.1); cardOn(T, 0.02, 0.992, -0.19, -0.12, true); cardOn(T, -0.05, 0.99, 0.5, 0.15); cardOn(T, 0.04, 0.992, 0.52, -0.2);
+      bx(T, 0.22, 0.09, 0.14, 0x17191d, 1.0, 1.03, -0.3); stackOf(T, -0.9, 0.985, -0.28, 9, 0); stackOf(T, -0.82, 0.985, -0.2, 6, 1); stackOf(T, -0.98, 0.985, -0.2, 7, 2); stackOf(T, 0.2, 0.985, 0.62, 4, 3);
+      dealer(-5.2, -2.6, { hair: 0x2a1c12, hairStyle: 'bun' }); for (const x of [-6.1, -5.2, -4.3]) stool(x, -0.15 + Math.abs(x + 5.2) * -0.35); }
+    { // roulette: the wheel and the layout
+      const T = new THREE.Group(); T.position.set(0, 0, -1.8); casG.add(T);
+      bx(T, 3.7, 0.14, 1.5, wood, 0, 0.9, 0); bx(T, 3.5, 0.15, 1.3, felt, 0, 0.905, 0); for (const x of [-1.4, 1.4]) bx(T, 0.3, 0.84, 1.0, wood, x, 0.42, 0);
+      const lay = canvasTex(512, 256, (c, W, H) => { c.fillStyle = '#1c7a48'; c.fillRect(0, 0, W, H); const R = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]); c.font = 'bold 20px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        for (let col = 0; col < 12; col++) for (let row = 0; row < 3; row++) { const n = col * 3 + 3 - row, x = 48 + col * 37, y = 20 + row * 52; c.fillStyle = R.has(n) ? '#b8262d' : '#17191d'; c.fillRect(x, y, 35, 50); c.fillStyle = '#fff'; c.fillText(String(n), x + 17, y + 26); }
+        c.fillStyle = '#1f8a4c'; c.fillRect(8, 20, 38, 154); c.strokeStyle = '#f4e7b0'; c.lineWidth = 2; c.strokeRect(8, 20, 38, 154); c.fillStyle = '#fff'; c.fillText('0', 27, 98);
+        c.strokeRect(48, 180, 443, 30); c.strokeRect(48, 212, 443, 30); c.font = 'bold 15px Arial, sans-serif'; ['1st 12', '2nd 12', '3rd 12'].forEach((t, i) => c.fillText(t, 122 + i * 148, 196)); ['1–18', 'EVEN', 'RED', 'BLACK', 'ODD', '19–36'].forEach((t, i) => c.fillText(t, 85 + i * 74, 228)); });
+      const lp = add(new THREE.PlaneGeometry(2.1, 1.05), new THREE.MeshBasicMaterial({ map: lay }), 0.6, 0.983, 0, T); lp.rotation.x = -Math.PI / 2;
+      cyl(T, 0.56, 0.5, 0.16, wood, -1.1, 1.03, 0, 28); cyl(T, 0.5, 0.5, 0.02, gold, -1.1, 1.115, 0, 28);
+      const wt = canvasTex(256, 256, (c, W) => { for (let i = 0; i < 37; i++) { c.fillStyle = i === 0 ? '#1f8a4c' : i % 2 ? '#b8262d' : '#17191d'; c.beginPath(); c.moveTo(W / 2, W / 2); c.arc(W / 2, W / 2, W / 2, i * 6.2832 / 37, (i + 1) * 6.2832 / 37); c.fill(); } c.fillStyle = '#5b3a22'; c.beginPath(); c.arc(W / 2, W / 2, W * 0.3, 0, 6.3); c.fill(); c.fillStyle = '#d9b34a'; c.beginPath(); c.arc(W / 2, W / 2, W * 0.08, 0, 6.3); c.fill(); });
+      const wheel = add(new THREE.CircleGeometry(0.47, 37), new THREE.MeshBasicMaterial({ map: wt }), -1.1, 1.128, 0, T); wheel.rotation.x = -Math.PI / 2; casG.userData.wheel = wheel;
+      cyl(T, 0.02, 0.07, 0.16, gold, -1.1, 1.2, 0, 10); stackOf(T, 1.55, 0.985, -0.45, 10, 0); stackOf(T, 1.47, 0.985, -0.38, 8, 3); stackOf(T, 1.6, 0.985, -0.33, 6, 1);
+      dealer(0.3, -2.95, { hair: 0x5b3f2a, hairStyle: 'short', beard: 0x5b3f2a }); }
+    { // poker: an oval with a padded rail, the dealer and the Shark
+      const T = new THREE.Group(); T.position.set(5.3, 0, -1.7); casG.add(T);
+      const rim = cyl(T, 1.25, 1.25, 0.13, 0x5a1a22, 0, 0.91, 0, 30); rim.scale.set(1.45, 1, 0.82); const top = cyl(T, 1.1, 1.1, 0.135, felt, 0, 0.912, 0, 30); top.scale.set(1.5, 1, 0.8);
+      cyl(T, 0.45, 0.6, 0.85, wood, 0, 0.42, 0, 14).scale.x = 1.5;
+      for (let i = 0; i < 5; i++) cardOn(T, -0.32 + i * 0.16, 0.982, 0, 0); cardOn(T, -0.06, 0.982, 0.55, 0.1, true); cardOn(T, 0.03, 0.984, 0.56, -0.15, true); cardOn(T, 1.1, 0.982, 0.05, 1.5, true); cardOn(T, 1.12, 0.984, -0.05, 1.7, true);
+      stackOf(T, 0, 0.982, -0.3, 8, 0); stackOf(T, 0.09, 0.982, -0.27, 6, 3); stackOf(T, -0.09, 0.982, -0.26, 5, 2); stackOf(T, 1.25, 0.982, 0.3, 12, 3); stackOf(T, 1.33, 0.982, 0.22, 10, 0);
+      dealer(5.3, -2.95, { hair: 0xd8d2c4, hairStyle: 'short', glasses: true });
+      const shark = makePerson(THREE, { top: 0x23262d, legs: 0x17191d, hair: 0x17191d, hairStyle: 'short', glasses: true, skin: 0xd9a57e }); shark.g.position.set(7.75, -0.3, -1.7); shark.g.rotation.y = -Math.PI / 2; casG.add(shark.g); casPeople.push(shark);
+      shark.armL.rotation.x = shark.armR.rotation.x = -1.0; bx(casG, 0.6, 0.55, 0.6, 0x5a1a22, 7.85, 0.28, -1.7); bx(casG, 0.12, 1.0, 0.6, 0x5a1a22, 8.2, 0.75, -1.7);
+      for (const x of [4.3, 5.3, 6.3]) stool(x, -0.35); }
+    // slot machines down both side walls
+    for (const k of [-1, 1]) for (let i = 0; i < 4; i++) { const z = 1.6 + i * 1.25, G2 = new THREE.Group(); G2.position.set(k * (HW - 0.55), 0, z); G2.rotation.y = -k * Math.PI / 2; casG.add(G2);
+      bx(G2, 0.8, 1.7, 0.62, [0x8a1f2b, 0x2456b8, 0x6a2f9a, 0x1f8a4c][i], 0, 0.85, 0); bx(G2, 0.84, 0.1, 0.66, gold, 0, 1.72, 0); bx(G2, 0.62, 0.42, 0.04, glow([0xffe9a8, 0xa8f0ff, 0xffb3e6, 0xc9ffb0][i]), 0, 1.25, 0.32);
+      for (let j = -1; j <= 1; j++) bx(G2, 0.16, 0.2, 0.05, 0xfbf8f0, j * 0.19, 1.25, 0.335); bx(G2, 0.62, 0.14, 0.2, 0x17191d, 0, 0.92, 0.36); bx(G2, 0.5, 0.2, 0.04, glow(0xffd76a), 0, 0.62, 0.32);
+      cyl(G2, 0.02, 0.02, 0.4, 0xc0c0c0, 0.46, 1.25, 0.1, 8); sph(G2, 0.05, 0xc0262d, 0.46, 1.47, 0.1); }
+    // the cashier's cage on the back wall
+    bx(casG, 5.2, 1.1, 0.7, wood, 0, 0.55, -HD + 0.6); bx(casG, 5.4, 0.08, 0.8, gold, 0, 1.14, -HD + 0.6); for (let i = -6; i <= 6; i++) cyl(casG, 0.022, 0.022, 1.5, gold, i * 0.4, 1.93, -HD + 0.6, 6);
+    bx(casG, 5.4, 0.12, 0.14, gold, 0, 2.7, -HD + 0.6);
+    add(new THREE.PlaneGeometry(3, 0.6), new THREE.MeshBasicMaterial({ map: canvasTex(512, 102, (c, W, H) => { c.fillStyle = '#17191d'; c.fillRect(0, 0, W, H); c.shadowColor = '#ffd76a'; c.shadowBlur = 14; c.fillStyle = '#ffe9a8'; c.font = 'bold 60px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; for (let i = 0; i < 2; i++) c.fillText('CASHIER', W / 2, H / 2 + 3); }) }), 0, 3.15, -HD + 0.08, casG);
+    // the door back to the street
+    bx(casG, 3.0, 3.1, 0.12, gold, 0, 1.55, HD - 0.05); for (const k of [-1, 1]) bx(casG, 1.3, 2.9, 0.1, 0x3a0f16, k * 0.68, 1.45, HD - 0.1);
+    const ex = add(new THREE.PlaneGeometry(0.62, 0.24), new THREE.MeshBasicMaterial({ map: canvasTex(128, 48, (c, W, H) => { c.fillStyle = '#b8201a'; c.fillRect(0, 0, W, H); c.fillStyle = '#fff'; c.font = 'bold 34px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('EXIT', W / 2, H / 2 + 2); }) }), 0, 3.35, HD - 0.12, casG); ex.rotation.y = Math.PI;
+  }
+  const casBlocked = (x, z) => Math.abs(x) > CIN.hw - 0.4 || Math.abs(z) > CIN.hd - 0.4 || z < -3.3 || (Math.abs(x + 5.2) < 1.95 && z < -0.45) || (Math.abs(x) < 2.15 && z < -0.75) || (Math.abs(x - 5.6) < 2.6 && z < -0.5)
+    || (Math.abs(x) > CIN.hw - 1.15 && z > 0.9) || (Math.abs(Math.abs(x) - 3.6) < 0.6 && Math.abs(Math.abs(z) - 3.5) < 0.6);
+  function enterCasino() { ctx.fade?.(); setBar(true); S.state = 'casino'; S.bx = 0; S.bz = CIN.hd - 1.4; S.yaw = 0; S.pitch = 0; mapEl.classList.add('hidden'); }
+  function leaveCasino() { ctx.fade?.(); setBar(false); S.state = 'foot'; S.px = CAS.x; S.pz = CAS.z + CAS.d / 2 + 5.2; S.yaw = Math.PI; S.pitch = 0; }
+  function updateCasino(dt, f, s) {
+    if (f || s) {
+      const sp = (ctx.keys.ShiftLeft || ctx.keys.ShiftRight ? 5 : 3.4) * Math.min(1, Math.hypot(f, s)), n = Math.hypot(f, s) || 1, sn = Math.sin(S.yaw), cs = Math.cos(S.yaw);
+      const nx = S.bx + (-sn * f + cs * s) / n * sp * dt, nz = S.bz + (-cs * f - sn * s) / n * sp * dt;
+      if (!casBlocked(nx, S.bz)) S.bx = nx; if (!casBlocked(S.bx, nz)) S.bz = nz;
+    }
+    camera.position.set(CIN.x + S.bx, CIN.y + 1.68, CIN.z + S.bz); camera.rotation.set(S.pitch, S.yaw, 0);
+    if (Math.hypot(S.bx, S.bz - CIN.hd) < 2) S.prompt = { k: 'out', t: 'Back out to Story St.' };
+    else if (Math.hypot(S.bx + 5.2, S.bz - 0.3) < 1.9) S.prompt = { k: 'blackjack', t: 'Play blackjack' };
+    else if (Math.hypot(S.bx, S.bz - 0.1) < 1.9) S.prompt = { k: 'roulette', t: 'Play roulette' };
+    else if (Math.hypot(S.bx - 5.3, S.bz - 0.3) < 1.9) S.prompt = { k: 'holdem', t: 'Play Texas hold’em against the Shark' };
+    for (const p of casPeople) { p.head.rotation.y = Math.sin(S.t * 0.6 + p.g.position.x) * 0.25; p.g.position.y += (Math.sin(S.t * 1.5 + p.g.position.x) * 0.0003); }
+    if (casG.userData.wheel) casG.userData.wheel.rotation.z += dt * 0.9;
+    let html = `<div class="g-top"><div class="pill">Story St. Casino</div><div class="pill">Chips: ${chips().toLocaleString('en-US')}</div></div>`;
+    if (S.prompt) html += `<div class="g-prompt">${ctx.touch ? `USE — ${S.prompt.t}` : `<kbd>E</kbd> or click — ${S.prompt.t}`}</div>`;
+    ctx.hud(html);
+  }
+  // put everything away and stand the player back on the street (used when leaving, and before jumping somewhere)
+  function settle() {
+    if (S.state === 'pool') { pool.stop(); tenderHome(); } else if (S.state === 'pong') pong.stop();
+    if (camera.fov !== 68) { camera.fov = 68; camera.updateProjectionMatrix(); } camera.up.set(0, 1, 0); setBar(false);
+    if (S.state === 'casino') { S.state = 'foot'; S.px = CAS.x; S.pz = CAS.z + CAS.d / 2 + 5.2; S.yaw = Math.PI; }
+    else if (S.state === 'pool' || S.state === 'pong' || S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; S.yaw = Math.PI; }
+  }
+  const HELP = {
+    street: ['Story St.', ['Walk with WASD or the arrow keys and look with the mouse. Hold Shift to run.', 'Press E or click when a prompt appears: your front door (No. 7), Lucky’s, the casino, the golf club.', 'Press C anywhere outside and your golf cart pulls up beside you.', 'Walk up to the golf club’s front door to start a round.']],
+    cart: ['The golf cart', ['W and S drive forward and back. A and D steer.', 'Hold Shift to drift: the back slides out and you turn harder.', 'Hold Space for turbo.', 'Press E to hop out. Water and buildings stop you; sand slows you down.']],
+    golf: ['Golf', ['Each shot has three steps: aim, power, accuracy.', 'Aim with the mouse or A and D. W and S change club (the game suggests one).', 'Hold click or Space to start the power bar and let go near the white mark. Then click again to stop the accuracy line: the middle is straight, the edges hook or slice.', 'After the ball stops, press E to go to it. The map in the corner shows the hole. Sand and rough cost distance; water is a one-stroke penalty.', 'Press Q to quit the round and stay outside.']],
+    bar: ['Lucky’s', ['Walk up to the bartender and press E to order a beer. Beers count: too many and you wake up at home.', 'The pool table plays 8-ball against the bartender.', 'The blue table is beer pong against Pat.', 'The door behind you leads back out to Story St.']],
+    pool: ['8-ball', ['Move the mouse to slide the crosshair; the cue points at it. A and D fine-tune.', 'Hold click to charge the power bar and release to shoot. The white line is your shot, yellow is where the object ball goes, blue is the cue ball.', 'Your first legal pot decides whether you are solids or stripes. Pot one of yours and you shoot again.', 'A scratch, a miss or hitting the wrong ball first is a foul: the other player gets ball in hand.', 'Clear your group, then sink the 8 to win. Sinking the 8 early loses. Press E to walk away.']],
+    pong: ['Beer pong', ['Move the mouse (or A and D) to slide your aim line left and right.', 'Hold click: a ring sweeps up and down the table. Let go when it sits over one of Pat’s cups.', 'Sink a cup and it comes off the table. First to clear all ten wins.', 'Every cup Pat sinks is a beer for you, and beers make your hand sway.', 'Press E to walk away.']],
+    casino: ['Story St. Casino', ['Walk up to a table and press E to sit down: blackjack on the left, roulette in the middle, Texas hold’em on the right.', 'Chips are play money and are remembered on this device. If you run out, the house spots you 500.', 'Each table has its own “How to play” at the bottom of its panel.', 'The doors behind you lead back out to Story St.']],
+  };
+
   const barBlocked = (x, z) => Math.abs(x) > BAR.hw - 0.4 || Math.abs(z) > BAR.hd - 0.4 || (x < 4.75 && z < -0.9) || z < -3.5
-    || (Math.abs(x + 4.3) < 1.75 && Math.abs(z - 2.6) < 1.15) || Math.hypot(x - 3.4, z - 3.4) < 0.8 || Math.hypot(x - 6.0, z - 1.0) < 0.8;
+    || (Math.abs(x + 4.3) < 1.75 && Math.abs(z - 2.6) < 1.15) || Math.hypot(x - 3.4, z - 3.4) < 0.8 || (Math.abs(x - 5.6) < 0.85 && Math.abs(z - 1.6) < 1.6);
   const TENDER_HOME = [-1.2, -3.2];
   // the pool game moves her around: x,z in table space, pose 'shoot' | 'watch'
   function poseTender(x, z, ry, pose, snap) {
@@ -403,20 +553,20 @@ export function createGolf(THREE, ctx) {
     tRag.visible = false; tCue.visible = !sh;
   }
   function tenderHome() { tender.position.set(TENDER_HOME[0], 0, TENDER_HOME[1]); tender.rotation.set(0, 0, 0); tArm.rotation.set(-1.1, 0, 0); tHead.rotation.set(0, 0, 0); tRag.visible = true; tCue.visible = false; }
-  const pool = createPool(THREE, { group: poolTable, lamp: poolLamp, top: 0.94, origin: { x: BAR.x - 4.3, y: BAR.y, z: BAR.z + 2.6 }, camera, touch: ctx.touch, tender: poseTender, line: t => { S.line = t; S.lineT = 3.6; },
+  const pool = createPool(THREE, { group: poolTable, lamp: poolLamp, top: 0.94, origin: { x: BAR.x - 4.3, y: BAR.y, z: BAR.z + 2.6 }, camera, touch: ctx.touch, tender: poseTender, line: t => { S.line = t; S.lineT = 3.6; S.lineWho = 'Bartender'; },
     bounds: { x0: -BAR.hw + 0.25 + 4.3, x1: BAR.hw - 0.25 + 4.3, z0: -BAR.hd + 0.25 - 2.6, z1: BAR.hd - 0.25 - 2.6 } });
   function enterPool() { ctx.fade?.(); S.state = 'pool'; S.lineT = 0; pool.start(); }
   function leavePool() { ctx.fade?.(); pool.stop(); camera.fov = 68; camera.updateProjectionMatrix(); tenderHome(); S.state = 'bar'; S.bx = -2.25; S.bz = 2.6; S.yaw = Math.PI / 2; S.pitch = -0.15; S.lineT = 0; }
   function updatePool(dt, s) {
     let html = pool.update(dt, s); S.lineT -= dt; tender.position.y = Math.sin(S.t * 1.7) * 0.004;
-    if (S.lineT > 0) html += `<div class="g-prompt" style="top:27%">Bartender: ${S.line}</div>`;
+    if (S.lineT > 0) html += `<div class="g-prompt" style="top:27%">${S.lineWho}: ${S.line}</div>`;
     ctx.hud(html);
   }
   const LINES = ['“First one’s on the house.”', '“Cold one, coming up.”', '“How did the Volcano treat you?”', '“Same again?”', '“Nobody drives the cart after this one.”', '“They say it brings luck on the Island hole.”', '“You live at number 7, right?”'];
   function setBar(on) { hemi.intensity = on ? 0.42 : 1.7; sun.intensity = on ? 0 : 1.9; }
   function enterBar() { ctx.fade?.(); setBar(true); S.state = 'bar'; S.bx = 0; S.bz = BAR.hd - 1.3; S.yaw = 0; S.pitch = 0; S.lineT = 0; mapEl.classList.add('hidden'); }
   function leaveBar() { ctx.fade?.(); setBar(false); S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; S.yaw = Math.PI; S.pitch = 0; }
-  function orderBeer() { S.line = LINES[(Math.random() * LINES.length) | 0]; S.lineT = 3.4; ctx.drink?.(); }
+  function orderBeer() { S.lineWho = 'Bartender'; S.line = LINES[(Math.random() * LINES.length) | 0]; S.lineT = 3.4; ctx.drink?.(); }
   function updateBar(dt, f, s) {
     if (f || s) {
       const sp = (ctx.keys.ShiftLeft || ctx.keys.ShiftRight ? 5 : 3.4) * Math.min(1, Math.hypot(f, s)), n = Math.hypot(f, s) || 1, sn = Math.sin(S.yaw), cs = Math.cos(S.yaw);
@@ -425,6 +575,7 @@ export function createGolf(THREE, ctx) {
     }
     camera.position.set(BAR.x + S.bx, BAR.y + 1.68, BAR.z + S.bz); camera.rotation.set(S.pitch, S.yaw, 0);
     if (Math.hypot(S.bx, S.bz - BAR.hd) < 1.9) S.prompt = { k: 'out', t: 'Back out to Story St.' };
+    else if (Math.abs(S.bx - 5.6) < 1.75 && S.bz > -0.6 && S.bz < 5.2) S.prompt = { k: 'pong', t: 'Play beer pong against Pat' };
     else if (Math.abs(S.bx + 4.3) < 2.45 && Math.abs(S.bz - 2.6) < 1.85) S.prompt = { k: 'pool', t: 'Play 8-ball against the bartender' };
     else if (Math.hypot(S.bx + 1.2, S.bz + 0.9) < 2.6) S.prompt = { k: 'tender', t: 'Order a beer' };
     // she wipes the bar and keeps an eye on you
@@ -433,7 +584,7 @@ export function createGolf(THREE, ctx) {
     tArm.rotation.z = Math.sin(S.t * 2.6) * 0.3; tender.position.y = Math.sin(S.t * 1.7) * 0.006;
     S.lineT -= dt;
     let html = `<div class="g-top"><div class="pill">Lucky’s</div></div>`;
-    if (S.lineT > 0) html += `<div class="g-prompt" style="top:24%">Bartender: ${S.line}</div>`;
+    if (S.lineT > 0) html += `<div class="g-prompt" style="top:24%">${S.lineWho}: ${S.line}</div>`;
     if (S.prompt) html += `<div class="g-prompt">${ctx.touch ? `USE — ${S.prompt.t}` : `<kbd>E</kbd> or click — ${S.prompt.t}`}</div>`;
     ctx.hud(html);
   }
@@ -498,7 +649,7 @@ export function createGolf(THREE, ctx) {
     px: 0, pz: 3, yaw: Math.PI, pitch: -0.02, led: true, golf: false, hole: 0, strokes: 0, card: [],
     ball: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, mode: 'rest', bounced: 0, spin: 0 }, last: [0, 0],
     aim: 0, club: 0, cT: 0, power: 0, accT: 0, swingT: 0, flT: 0, shotAim: 0, shotClub: 0, msg: '', msgT: 0, sub: '', t: 0, endT: 0, shotFrom: [0, 0],
-    prevF: 0, bx: 0, bz: 4.6, turbo: false, drift: false, line: '', lineT: 0, done: true, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
+    prevF: 0, bx: 0, bz: 4.6, turbo: false, drift: false, line: '', lineT: 0, lineWho: 'Bartender', done: true, pen: false, prompt: null, toCorner: false, tgtD: 0, tgtY: 0, snap: true, cutT: 0, cutDone: true, landCam: null, camPos: new THREE.Vector3(0, 1.65, 3), camLook: new THREE.Vector3(),
   };
   const hole = () => holes[S.hole];
   const say = (m, sub = '', t = 2.6) => { S.msg = m; S.sub = sub; S.msgT = t; };
@@ -508,7 +659,7 @@ export function createGolf(THREE, ctx) {
     if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) return true;
     if (Math.abs(x) < 24 + r && z > -29 - r && z < -11.5 + r) return true;            // clubhouse
     if (Math.abs(x) < 9.5 + r && z > -12 && z < -6.6 + r) return true;                 // portico
-    for (const B of [APT, LKY]) if (Math.abs(x - B.x) < B.w / 2 + r && z > B.z - B.d / 2 - r && z < B.z + B.d / 2 + r) return true;
+    for (const B of [APT, LKY, CAS]) if (Math.abs(x - B.x) < B.w / 2 + r && z > B.z - B.d / 2 - r && z < B.z + B.d / 2 + r) return true;
     for (const p of ponds) if (inWater(p, x, z, -0.12)) return true;                 // water blocks you; the island itself is walkable
     for (const t of trees) if (Math.abs(x - t.x) < 2 && Math.abs(z - t.z) < 2 && Math.hypot(x - t.x, z - t.z) < 0.5 * t.s + r) return true;
     return false;
@@ -642,7 +793,9 @@ export function createGolf(THREE, ctx) {
   // fromClick: a mouse click only acts on things you are standing next to; skipping ahead needs E
   function use(fromClick) {
     if (S.state === 'pool') { leavePool(); return; }
-    if (S.state === 'bar') { if (S.prompt?.k === 'out') leaveBar(); else if (S.prompt?.k === 'pool') enterPool(); else if (S.prompt?.k === 'tender') orderBeer(); return; }
+    if (S.state === 'pong') { leavePong(); return; }
+    if (S.state === 'casino') { if (S.prompt?.k === 'out') leaveCasino(); else if (S.prompt) ctx.casino?.(S.prompt.k); return; }
+    if (S.state === 'bar') { if (S.prompt?.k === 'out') leaveBar(); else if (S.prompt?.k === 'pong') enterPong(); else if (S.prompt?.k === 'pool') enterPool(); else if (S.prompt?.k === 'tender') orderBeer(); return; }
     if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; return; }
     if (S.state === 'landed') { if (!S.done) goNext(); return; }
     if (S.state === 'cart') { exitCart(); if (!S.done && Math.hypot(S.ball.x - S.px, S.ball.z - S.pz) < 9) { standBy(); address(); } return; }
@@ -655,12 +808,13 @@ export function createGolf(THREE, ctx) {
     else if (k === 'club') { ctx.fade?.(); reset(); }
     else if (k === 'door') ctx.goInside?.();
     else if (k === 'bar') enterBar();
+    else if (k === 'casino') enterCasino();
   }
   // A round of golf is something you start (at the club's front door) and can quit; otherwise you are just out on Story St.
   function reset() { S.card = []; S.done = false; S.golf = true; S.pen = false; S.phase = 'aim'; teeUp(0); const h = holes[0]; cart.h = Math.atan2(h.dir0[0], h.dir0[1]); cart.x = h.tee[0] - h.dir0[1] * 5 - h.dir0[0] * 7; cart.z = h.tee[1] + h.dir0[0] * 5 - h.dir0[1] * 7; cart.v = 0; S.state = 'cart'; S.led = true; say('Hole 1', 'A fresh round.', 2.5); }
 
   function quit() {
-    if (!S.golf || S.state === 'bar' || S.state === 'pool') return false;
+    if (!S.golf || S.state === 'bar' || S.state === 'pool' || S.state === 'pong' || S.state === 'casino') return false;
     S.golf = false; S.done = true; S.pen = false; S.phase = 'aim'; S.msgT = 0;
     if (S.state === 'address' || S.state === 'landed' || S.state === 'flight' || S.state === 'holed') { S.state = 'foot'; S.yaw = camera.rotation.y; S.pitch = 0; }
     ctx.toast?.('Round over. The club will start you a new one any time.');
@@ -734,22 +888,27 @@ export function createGolf(THREE, ctx) {
   const api = {
     scene, camera, S, cart,
     get pool() { return pool; },
-    get label() { return S.state === 'pool' ? pool.label : S.state === 'address' ? (S.phase === 'acc' ? 'STOP' : 'SWING') : S.state === 'cart' ? 'EXIT' : S.state === 'landed' ? 'NEXT' : 'USE'; },
-    get canBack() { return S.state === 'address' || S.state === 'pool'; },
-    back() { if (S.state === 'pool') leavePool(); else if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; } },
+    get pong() { return pong; },
+    goto(dest) { settle(); if (dest === 'golf') { ctx.fade?.(); reset(); } else if (dest === 'bar') enterBar(); else if (dest === 'casino') enterCasino(); },
+    help() { const k = S.state === 'cart' ? 'cart' : S.state === 'bar' || S.state === 'pool' || S.state === 'pong' || S.state === 'casino' ? S.state : S.golf ? 'golf' : 'street'; return { title: HELP[k][0], items: HELP[k][1] }; },
+    get label() { return S.state === 'pong' ? pong.label : S.state === 'pool' ? pool.label : S.state === 'address' ? (S.phase === 'acc' ? 'STOP' : 'SWING') : S.state === 'cart' ? 'EXIT' : S.state === 'landed' ? 'NEXT' : 'USE'; },
+    get canBack() { return S.state === 'address' || S.state === 'pool' || S.state === 'pong'; },
+    back() { if (S.state === 'pong') leavePong(); else if (S.state === 'pool') leavePool(); else if (S.state === 'address') { S.state = 'foot'; S.phase = 'aim'; } },
     use, reset, quit, summon,
     // test hook: play a shot with a given power (0..1) and accuracy (-1..1, 0 = straight)
     hit(p, dev = 0) { if (S.state === 'address') { S.power = clamp(p, 0, 1); swing(dev); } },
     enter() { setBar(false); S.state = 'foot'; S.px = APT.x; S.pz = APT.z + APT.d / 2 + 4.8; S.yaw = -2.2; S.pitch = 0;   // out of your front door, looking down the street to the club
       say('Story St.', S.golf ? '' : 'Your cart is parked outside. The golf club starts rounds at its front door.', 4); },
-    leave() { setBar(false); if (S.state === 'pool') { pool.stop(); camera.fov = 68; camera.updateProjectionMatrix(); tenderHome(); S.state = 'bar'; } if (S.state === 'bar') { S.state = 'foot'; S.px = LKY.x; S.pz = LKY.z + LKY.d / 2 + 4.6; } mapEl.classList.add('hidden'); },
+    leave() { settle(); mapEl.classList.add('hidden'); },
     look(dx, dy) {
       if (S.state === 'pool') { pool.look(dx, dy); return; }
+      if (S.state === 'pong') { pong.look(dx); return; }
       if (S.state === 'address') { if (S.phase !== 'acc') S.aim -= dx * 0.0011; return; }
-      if (S.state === 'foot' || S.state === 'bar') { S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.3, 1.3); }
+      if (S.state === 'foot' || S.state === 'bar' || S.state === 'casino') { S.yaw -= dx * 0.0022; S.pitch = clamp(S.pitch - dy * 0.0022, -1.3, 1.3); }
     },
     down(src) {
       if (S.state === 'pool') { pool.down(); return; }
+      if (S.state === 'pong') { pong.down(); return; }
       if (S.state === 'address') {
         if (S.phase === 'aim') { S.phase = 'power'; S.cT = 0; S.power = 0; }
         else if (S.phase === 'acc' && S.accT > 0.12) swing(accPos());
@@ -757,6 +916,7 @@ export function createGolf(THREE, ctx) {
     },
     up() {
       if (S.state === 'pool') { pool.up(); return; }
+      if (S.state === 'pong') { pong.up(); return; }
       if (S.state !== 'address' || S.phase !== 'power') return;
       if (S.cT > 0.06) { S.phase = 'acc'; S.accT = 0; } else S.phase = 'aim';      // power is locked in; now stop the accuracy line
     },
@@ -764,9 +924,11 @@ export function createGolf(THREE, ctx) {
       S.t += dt; S.msgT -= dt; S.swingT -= dt;
       const { f, s } = ctx.axes(), b = S.ball, h = hole();
       S.prompt = null;
-      if (camera.fov !== 68 && S.state !== 'cart' && S.state !== 'pool') { camera.fov = 68; camera.updateProjectionMatrix(); }
+      if (camera.fov !== 68 && S.state !== 'cart' && S.state !== 'pool' && S.state !== 'pong') { camera.fov = 68; camera.updateProjectionMatrix(); }
       if (S.state === 'bar') { updateBar(dt, f, s); return; }
       if (S.state === 'pool') { updatePool(dt, s); return; }
+      if (S.state === 'pong') { updatePong(dt, s); return; }
+      if (S.state === 'casino') { updateCasino(dt, f, s); return; }
       if (S.state === 'landed' && (Math.abs(f) > 0.3 || Math.abs(s) > 0.3)) S.state = 'foot';        // walk off instead of skipping ahead
       if (S.state === 'foot') {
         if (f || s) {
@@ -780,6 +942,7 @@ export function createGolf(THREE, ctx) {
         else if (!S.done && near(b.x, b.z, 3.6)) S.prompt = { k: 'ball', t: 'Play your shot' };
         else if (near(APT.x, APT.z + APT.d / 2 + 0.9, 2.5)) S.prompt = { k: 'door', t: 'No. 7 — go up to your apartment' };
         else if (near(LKY.x, LKY.z + LKY.d / 2 + 0.9, 2.5)) S.prompt = { k: 'bar', t: 'Go into Lucky’s' };
+        else if (near(CAS.x, CAS.z + CAS.d / 2 + 1.2, 3)) S.prompt = { k: 'casino', t: 'Go into the casino' };
         else if (near(0, -8, 4.5)) S.prompt = { k: 'club', t: S.golf ? 'Start the round over from the first tee' : 'Play a round of golf' };
         else if (farBall && S.led) S.prompt = { k: 'next', t: S.strokes === 0 ? `Go to the hole ${S.hole + 1} tee` : 'Go to your ball' };
       } else if (S.state === 'landed') {

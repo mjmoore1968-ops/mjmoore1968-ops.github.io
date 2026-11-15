@@ -37,6 +37,11 @@
   #pause{background:rgba(6,8,12,.55);cursor:pointer;text-align:center}
   #pause p{font-size:20px;font-weight:600;margin:0}
   #pause small{display:block;color:var(--dim);margin-top:8px}
+  #pause .pmenu{max-width:560px;width:100%}
+  #pause .prow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center;margin-top:18px}
+  #pause .prow span{color:var(--dim);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+  #howBox{margin-top:16px;text-align:left;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:14px 18px;cursor:default;max-height:46vh;overflow:auto}
+  #howBox h3{margin:0 0 8px;font-family:Georgia,serif;font-size:19px} #howBox ul{margin:0;padding-left:18px} #howBox li{margin:6px 0;line-height:1.45;font-size:14.5px} #howBox small{margin-top:10px}
 
   #panel{background:rgba(6,8,12,.6);backdrop-filter:blur(3px)}
   #panel .box{position:relative;background:var(--glass);border:1px solid var(--line);border-radius:18px;
@@ -167,7 +172,12 @@
 <div id="black"></div>
 <div id="plane">✈️</div>
 
-<div id="pause" class="overlay hidden"><div><p>Paused</p><small>Click anywhere to keep going</small><button class="btn ghost small hidden" id="quitGolfBtn" style="margin-top:18px">Quit golf round</button><br><button class="btn ghost small hidden" id="homeBtn" style="margin-top:10px">Back to home</button></div></div>
+<div id="pause" class="overlay hidden"><div class="pmenu">
+  <p>Paused</p><small>Click anywhere to keep going</small>
+  <div class="prow"><span>Go to</span><button class="btn small" data-go="home">Home</button><button class="btn small" data-go="golf">Golf Course</button><button class="btn small" data-go="bar">Bar</button><button class="btn small" data-go="casino">Casino</button></div>
+  <div class="prow"><button class="btn ghost small" id="howBtn">How to play</button><button class="btn ghost small hidden" id="quitGolfBtn">Quit golf round</button></div>
+  <div id="howBox" class="hidden"></div>
+</div></div>
 
 <div id="panel" class="overlay hidden">
   <div class="box">

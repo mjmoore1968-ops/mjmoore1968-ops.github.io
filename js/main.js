@@ -2,6 +2,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { createLacrosse, createRocket, createParkour, makeLacrosseStick, VEHICLES } from './games.js';
 import * as LB from './leaderboard.js';
 import { createGolf } from './golf.js';
+import { openGame as openCasinoGame } from './casino.js';
 
 const LINKS = {
   email: 'mmoore@college.harvard.edu',
@@ -621,7 +622,11 @@ function lock() {
   try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* the "click to look" hint covers this */ }
 }
 function unlock() { if (locked()) { leaving = true; document.exitPointerLock(); } }
-function setPaused(v) { S.paused = v; $('pause').classList.toggle('hidden', !v); $('homeBtn').classList.toggle('hidden', S.mode !== 'outside'); $('quitGolfBtn').classList.toggle('hidden', !(S.mode === 'outside' && golf?.S.golf)); }
+function setPaused(v) {
+  S.paused = v; $('pause').classList.toggle('hidden', !v); $('howBox').classList.add('hidden');
+  $('quitGolfBtn').classList.toggle('hidden', !(S.mode === 'outside' && golf?.S.golf));
+  if (v) for (const k in keys) keys[k] = false;
+}
 document.addEventListener('pointerlockchange', () => {
   if (locked()) { setPaused(false); return; }
   if (leaving) { leaving = false; return; }
@@ -630,7 +635,24 @@ document.addEventListener('pointerlockchange', () => {
 });
 $('pause').addEventListener('click', () => { setPaused(false); lock(); });
 $('quitGolfBtn').addEventListener('click', e => { e.stopPropagation(); setPaused(false); golf?.quit(); lock(); });   // end the round but stay outside
-$('homeBtn').addEventListener('click', e => { e.stopPropagation(); setPaused(false); goInside(); });      // Esc on the golf course offers a way home
+// The pause menu doubles as a map: jump straight home, to the first tee, into Lucky's or into the casino.
+function travel(dest) {
+  setPaused(false);
+  if (dest === 'home') { if (S.mode === 'outside') goInside(); else { S.pos.set(13.3, 1.62, 3.0); S.yaw = 0; S.pitch = 0; } }
+  else if (S.mode === 'outside') { golf.goto(dest); lastHud = ''; }
+  else goOutside(() => golf.goto(dest));
+  lock();
+}
+for (const b of document.querySelectorAll('#pause [data-go]')) b.addEventListener('click', e => { e.stopPropagation(); travel(b.dataset.go); });
+const WORLD_HELP = { title: 'The apartment', items: ['Walk with WASD or the arrow keys and look with the mouse.', 'Press E or click on anything that shows a prompt. E, Esc or “Back to world” closes whatever you opened.', 'The TV and console in the living room launch the three arcade games.', 'The bar cart pours beers. They wear off slowly, but too many and you wake up back in bed.', 'The red front door leads outside to Story St.: your golf cart, the golf club, Lucky’s and the casino.'] };
+$('howBtn').addEventListener('click', e => {
+  e.stopPropagation(); const box = $('howBox');
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  const h = S.mode === 'outside' && golf ? golf.help() : WORLD_HELP;
+  box.innerHTML = `<h3>${h.title}</h3><ul>${h.items.map(t => `<li>${t}</li>`).join('')}</ul>${TOUCH ? '<small>On a phone: the stick moves, dragging looks or aims, and the gold button does whatever its label says.</small>' : ''}`;
+  box.classList.remove('hidden');
+});
+$('howBox').addEventListener('click', e => e.stopPropagation());
 
 /* ------------------------------------------------------------------ HUD helpers */
 let toastTimer;
@@ -750,16 +772,22 @@ function fadeThrough(mid) {
   const b = $('black'); b.style.transition = 'opacity .35s ease'; b.style.opacity = 1;
   setTimeout(() => { mid(); b.style.opacity = 0; }, 380);
 }
-function goOutside() {
+function goOutside(after) {
   fadeThrough(() => {
-    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drink,
+    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drink, drinks: () => S.drinks, casino: openCasino,
       fade() { const b = $('black'); b.style.transition = 'none'; b.style.opacity = 1; requestAnimationFrame(() => { b.style.transition = 'opacity .7s ease'; b.style.opacity = 0; }); } });
     golf.camera.aspect = innerWidth / innerHeight; golf.camera.updateProjectionMatrix();
-    golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter();
+    golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter(); if (typeof after === 'function') after();
   });
 }
 function goInside() {
   fadeThrough(() => { golf?.leave(); S.mode = 'world'; S.pos.set(13.3, 1.62, 3.9); S.yaw = 0; S.pitch = 0; lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); wobbleFilter(); });
+}
+// a seat at one of the casino's tables: the game runs in a panel over the room
+function openCasino(kind) {
+  let stop = null;
+  openPanel('<div id="czBody"></div>', () => stop?.());
+  stop = openCasinoGame(kind, $('czBody'));
 }
 function golfFinish(r) {
   const total = r.card.reduce((a, v) => a + v, 0), par = r.pars.reduce((a, v) => a + v, 0), d = total - par;
@@ -905,6 +933,7 @@ addEventListener('keydown', e => {
     else if (S.mode === 'game') exitGame(true);
     else if (S.paused) { if (e.code === 'KeyE') { setPaused(false); lock(); } }
     else if (S.mode === 'world' && e.code === 'KeyE') use();
+    else if (S.mode === 'world' && e.code === 'Escape') setPaused(true);
     else if (S.mode === 'outside' && e.code === 'KeyE') golf.use();
     else if (S.mode === 'outside' && e.code === 'Escape') setPaused(true);
   } else if (S.mode === 'outside' && !S.paused && e.code === 'KeyC') golf.summon();
@@ -938,7 +967,7 @@ function touchUI() {
 }
 if (TOUCH) {
   const el = document.createElement('div'); el.id = 'touch'; el.className = 'hidden';
-  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tCall" class="tMini hidden">CART</button><button id="tQuit" class="tMini hidden">QUIT GOLF</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
+  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tMenu" class="tMini">☰ MENU</button><button id="tCall" class="tMini hidden">CART</button><button id="tQuit" class="tMini hidden">QUIT GOLF</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
   document.body.appendChild(el);
   const css = document.createElement('style');
   css.textContent = `
@@ -952,7 +981,7 @@ if (TOUCH) {
     #tAct:active{filter:brightness(1.15)}
     .tCart{position:absolute;right:max(132px,calc(env(safe-area-inset-right) + 106px));width:72px;height:72px;border-radius:50%;pointer-events:auto;background:rgba(16,21,31,.82);color:#fff;border:2px solid rgba(255,255,255,.4);font-weight:800;font-size:11.5px;letter-spacing:.03em;touch-action:none}
     .tMini{position:absolute;left:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 13px;font-weight:700;font-size:12px;letter-spacing:.03em}
-    #tCall{top:136px} #tQuit{top:176px}
+    #tCall{top:136px} #tQuit{top:176px} #tMenu{top:216px}
     .tCart.on{background:rgba(242,180,65,.92);color:#1a1303} #tTurbo{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tDrift{bottom:max(34px,env(safe-area-inset-bottom))}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
@@ -994,7 +1023,7 @@ if (TOUCH) {
         const L = tu.look; tu.look = null;
         const tap = Math.hypot(t.clientX - L.x0, t.clientY - L.y0) < 12 && performance.now() - L.t0 < 320;
         if (tap && S.mode === 'world') use(t.clientX, t.clientY);
-        else if (tap && S.mode === 'outside' && (golf.S.state === 'foot' || golf.S.state === 'bar')) golf.use(true);
+        else if (tap && S.mode === 'outside' && (golf.S.state === 'foot' || golf.S.state === 'bar' || golf.S.state === 'casino')) golf.use(true);
       }
     }
   };
@@ -1003,6 +1032,7 @@ if (TOUCH) {
   act.addEventListener('touchstart', e => { e.preventDefault(); if (S.mode === 'game') active?.down?.('btn'); else if (S.mode === 'outside') golf.down('btn'); else if (S.mode === 'world') use(); }, { passive: false });
   act.addEventListener('touchend', e => { e.preventDefault(); if (S.mode === 'game') active?.up?.('btn'); else if (S.mode === 'outside') golf.up(); }, { passive: false });
   $('tExit').addEventListener('click', () => { if (S.mode === 'outside') golf.back(); else exitGame(true); });
+  $('tMenu').addEventListener('click', () => { if (S.mode === 'world' || S.mode === 'outside') setPaused(true); });
   $('tCall').addEventListener('click', () => { if (S.mode === 'outside') golf.summon(); });
   $('tQuit').addEventListener('click', () => { if (S.mode === 'outside') golf.quit(); });
   for (const [id, code] of [['tTurbo', 'Space'], ['tDrift', 'ShiftLeft']]) {            // cart buttons: hold to boost or slide
@@ -1105,7 +1135,7 @@ function frame(now) {
     const lb = S.mode === 'game' ? (active?.label || 'GO') : S.mode === 'outside' ? golf.label : 'USE'; if (lb !== lastLabel) { lastLabel = lb; $('tAct').textContent = lb; }
     $('tExit').classList.toggle('hidden', !(S.mode === 'game' || (S.mode === 'outside' && golf.canBack)));
     const out = S.mode === 'outside' && !S.paused, gs = out ? golf.S.state : '';
-    $('tCall').classList.toggle('hidden', !(gs === 'foot' || gs === 'landed')); $('tQuit').classList.toggle('hidden', !(out && golf.S.golf && gs !== 'bar' && gs !== 'pool'));
+    $('tCall').classList.toggle('hidden', !(gs === 'foot' || gs === 'landed')); $('tQuit').classList.toggle('hidden', !(out && golf.S.golf && gs !== 'bar' && gs !== 'pool' && gs !== 'pong' && gs !== 'casino'));
     const inCart = S.mode === 'outside' && golf.S.state === 'cart' && !S.paused;
     if (inCart !== cartBtns) { cartBtns = inCart; for (const id of ['tTurbo', 'tDrift']) { $(id).classList.toggle('hidden', !inCart); $(id).classList.remove('on'); } if (!inCart) keys.Space = keys.ShiftLeft = false; }
   }
