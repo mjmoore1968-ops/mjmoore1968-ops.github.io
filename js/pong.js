@@ -1,5 +1,5 @@
 // Beer pong against Pat, on the table in Lucky's.
-// House rules: ten cups each, two balls a turn, make both and you get the balls back. A bounce shot that drops
+// House rules: six cups each (3-2-1), two balls a turn, make both and you get the balls back. A bounce shot that drops
 // is worth two cups, but the defender may swat a bounced ball away.
 // Table space: the table runs along z. You throw from the +z end at Pat's cups, which sit at the -z end.
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -7,7 +7,7 @@ const TOP = 0.78, HL = 1.2, HW = 0.38;       // table height, half length, half 
 const CUP_H = 0.115, RIM = 0.045, SINK = 0.033, LIP = 0.052;
 const ZONE = 0.11;                           // half width of the sweet spot on the timing bar
 const rackAt = side => {                     // side -1: Pat's cups (your targets). +1: yours.
-  const out = []; for (let r = 0; r < 4; r++) for (let i = 0; i < 4 - r; i++) out.push({ x: (i - (3 - r) / 2) * 0.098, z: side * (1.05 - r * 0.085), on: true, mesh: null, gone: 0 });
+  const out = []; for (let r = 0; r < 3; r++) for (let i = 0; i < 3 - r; i++) out.push({ x: (i - (2 - r) / 2) * 0.098, z: side * (1.05 - r * 0.085), on: true, mesh: null, gone: 0 });
   return out;
 };
 
