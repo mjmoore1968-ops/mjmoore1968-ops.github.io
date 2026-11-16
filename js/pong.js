@@ -5,7 +5,9 @@
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const TOP = 0.78, HL = 1.2, HW = 0.38;       // table height, half length, half width
 const CUP_H = 0.115, RIM = 0.045, SINK = 0.033, LIP = 0.052;
-const ZONE = 0.11;                           // half width of the sweet spot on the timing bar
+const OX = 0, OZ = 0.75;                     // where your throws leave your hand
+const DMIN = 1.25, DSPAN = 0.85;             // power 0..1 → how far down the table the ball comes down
+const SWEEP = 0.6;                          // seconds for the power bar to run from empty to full
 const rackAt = side => {                     // side -1: Pat's cups (your targets). +1: yours.
   const out = []; for (let r = 0; r < 3; r++) for (let i = 0; i < 3 - r; i++) out.push({ x: (i - (2 - r) / 2) * 0.098, z: side * (1.05 - r * 0.085), on: true, mesh: null, gone: 0 });
   return out;
@@ -34,8 +36,8 @@ export function createPong(THREE, host) {
   }
   const ball = add(new THREE.SphereGeometry(0.02, 14, 10), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x666666 }), 0, TOP + 0.5, HL + 0.2);
   const shadow = flat(new THREE.CircleGeometry(0.022, 14), B(0x000000, 0.35), 0, TOP + 0.003, 0);
-  const aim = new THREE.Group(); group.add(aim);                                                     // the reticle you aim with
-  { const m = B(0xffe066); flat(new THREE.RingGeometry(0.03, 0.038, 26), m, 0, 0, 0, aim); flat(new THREE.CircleGeometry(0.006, 10), m, 0, 0, 0, aim); for (const [w, d, x, z] of [[0.03, 0.005, 0.055, 0], [0.03, 0.005, -0.055, 0], [0.005, 0.03, 0, 0.055], [0.005, 0.03, 0, -0.055]]) flat(new THREE.PlaneGeometry(w, d), m, x, 0, z, aim); }
+  const aim = new THREE.Group(); aim.position.set(OX, TOP + 0.004, OZ); group.add(aim);              // an arrow showing your direction only, never where the ball lands
+  { const m = B(0xffe066, 0.85); const shaft = flat(new THREE.PlaneGeometry(0.014, 0.4), m, 0, 0, -1.08, aim); const head = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.08, 3), m); head.rotation.x = -Math.PI / 2; head.position.set(0, 0, -1.31); aim.add(head); shaft.renderOrder = head.renderOrder = 2; }   // drawn 0.9–1.35 m out: well short of the cups (1.6–1.8 m)
   const hop = flat(new THREE.RingGeometry(0.02, 0.027, 20), B(0x9fd8ff, 0.9), 0, TOP + 0.004, 0);     // where a bounce shot touches down first
   const splash = flat(new THREE.RingGeometry(0.03, 0.04, 22), B(0xffffff, 0.9), 0, TOP + CUP_H + 0.01, 0); splash.visible = false;
   const hand = add(new THREE.BoxGeometry(0.11, 0.16, 0.05), L(0xf0c8a6), 0, TOP + 0.2, 0.7); hand.visible = false;   // your hand, when you swat
@@ -43,7 +45,7 @@ export function createPong(THREE, host) {
 
   const P = {
     on: false, turn: 'you', phase: 'aim',          // aim | time | fly | pat | over
-    rx: 0, rz: -0.9, sx: 0, sz: 0, tm: 0, cT: 0, bounce: false, t: 0, fly: null, msg: '', msgT: 0, wait: 0, winner: null,
+    ang: 0, sx: 0, sz: 0, tm: 0, cT: 0, lastPow: null, bounce: false, t: 0, fly: null, msg: '', msgT: 0, wait: 0, winner: null,
     ballNo: 1, made: 0, lost: 0, cam: 0, patArm: 0, swat: 0, swatLock: false, splashT: 0, throws: 0,
   };
   const left = k => sets[k].filter(c => c.on).length;
@@ -53,12 +55,12 @@ export function createPong(THREE, host) {
 
   function reset() {
     for (const k of ['pat', 'you']) for (const c of sets[k]) { c.on = true; c.gone = 0; c.mesh.visible = true; c.mesh.scale.setScalar(1); c.mesh.position.y = TOP + CUP_H / 2; }
-    Object.assign(P, { turn: 'you', phase: 'aim', rx: 0, rz: -0.9, bounce: false, fly: null, winner: null, ballNo: 1, made: 0, lost: 0, wait: 0, swat: 0, swatLock: false, throws: 0 });
+    Object.assign(P, { turn: 'you', phase: 'aim', ang: 0, lastPow: null, bounce: false, fly: null, winner: null, ballNo: 1, made: 0, lost: 0, wait: 0, swat: 0, swatLock: false, throws: 0 });
     ball.visible = shadow.visible = splash.visible = hand.visible = false;
   }
   // Throw a ball at a spot. A bounce shot touches the table part-way first, then hops on to the spot.
   function launch(who, to, bounce) {
-    const from = who === 'you' ? { x: P.rx * 0.3, y: TOP + 0.5, z: 0.75 } : { x: 0.1, y: TOP + 0.62, z: -HL - 0.25 };
+    const from = who === 'you' ? { x: OX, y: TOP + 0.5, z: OZ } : { x: 0.1, y: TOP + 0.62, z: -HL - 0.25 };
     const mid = bounce ? { x: from.x + (to.x - from.x) * 0.55, y: TOP + 0.02, z: from.z + (to.z - from.z) * 0.55 } : null;
     P.fly = { who, from, to, mid, bounce, t: 0, T1: bounce ? 0.42 : 0.72, T2: bounce ? 0.5 : 0, blocked: false, out: null, willBlock: who === 'you' && bounce && Math.random() < 0.4 };
     P.phase = 'fly'; ball.visible = shadow.visible = true; P.throws++; P.swat = 0; P.swatLock = false;
@@ -108,7 +110,7 @@ export function createPong(THREE, host) {
     start() { P.on = true; reset(); pat.g.visible = true; say('Beer pong — two balls a turn', 2.6); host.line?.('“Rack ’em. Loser buys.”'); },
     stop() { P.on = false; reset(); pat.g.visible = false; aim.visible = hop.visible = false; },
     key(code) { if (code === 'KeyB' && P.turn === 'you' && P.phase === 'aim') P.bounce = !P.bounce; },
-    look(dx, dy = 0) { if (P.turn === 'you' && P.phase === 'aim') { P.rx = clamp(P.rx + dx * 0.0009, -0.34, 0.34); P.rz = clamp(P.rz + dy * 0.0009, -1.17, -0.55); } },
+    look(dx) { if (P.turn === 'you' && P.phase === 'aim') P.ang = clamp(P.ang + dx * 0.00045, -0.22, 0.22); },
     down() {
       if (P.phase === 'over') { reset(); say('New game — you throw first', 2.2); host.line?.('“Run it back.”'); return; }
       if (P.phase === 'fly' && P.fly.who === 'pat' && P.fly.bounce && !P.fly.out && !P.swatLock) {          // your swat at Pat's bounce
@@ -121,18 +123,19 @@ export function createPong(THREE, host) {
     up() {
       if (P.turn !== 'you' || P.phase !== 'time') return;
       if (P.cT < 0.06) { P.phase = 'aim'; return; }
-      const e = (P.tm - 0.5) * 2, z = ZONE * 2, off = Math.abs(e) <= z ? 0 : (Math.abs(e) - z) * Math.sign(e), j = () => (Math.random() - 0.5) * 2;
-      // inside the green: the ball goes where the reticle is. Outside: short or long by how far you missed it.
-      launch('you', { x: P.rx + P.sx + j() * (0.011 + Math.abs(off) * 0.05), z: P.rz + P.sz + j() * 0.011 - off * 0.36 }, P.bounce);
-      if (!off && Math.abs(e) < 0.05) say('Perfect release', 0.7);
+      // where it lands: power sets the distance, the arrow sets the direction, and your hand is never perfectly steady
+      const d = drinks(), shake = () => (Math.random() + Math.random() - 1);
+      const dist = DMIN + P.tm * DSPAN + shake() * (0.026 + d * 0.006), th = P.ang + P.sx + shake() * (0.009 + d * 0.003);
+      P.lastPow = P.tm;
+      launch('you', { x: OX + Math.sin(th) * dist, z: OZ - Math.cos(th) * dist }, P.bounce);
     },
     // test hook: throw straight at a spot
     throwAt(x, z, bounce = false) { if (P.turn === 'you' && (P.phase === 'aim' || P.phase === 'time')) launch('you', { x, z }, bounce); },
     update(dt, s, fwd = 0) {
       P.t += dt; P.msgT -= dt; P.swat -= dt;
-      const d = drinks(); P.sx = (Math.sin(P.t * 1.9) * 0.007 + Math.sin(P.t * 3.3) * 0.003) * d; P.sz = Math.cos(P.t * 1.5) * 0.006 * d;      // a few beers in, your aim wanders
-      if (P.phase === 'aim' && P.turn === 'you') { P.rx = clamp(P.rx + s * dt * 0.22, -0.34, 0.34); P.rz = clamp(P.rz - fwd * dt * 0.22, -1.17, -0.55); }
-      else if (P.phase === 'time') { P.cT += dt; const p = (P.cT / 0.85) % 2; P.tm = p < 1 ? p : 2 - p; }
+      const d = drinks(); P.sx = (Math.sin(P.t * 1.9) * 0.006 + Math.sin(P.t * 3.3) * 0.0025) * (0.35 + d);                // the arrow drifts a little, and a lot more after a few beers
+      if (P.phase === 'aim' && P.turn === 'you') P.ang = clamp(P.ang + s * dt * 0.12, -0.22, 0.22);
+      else if (P.phase === 'time') { P.cT += dt; const p = (P.cT / SWEEP) % 2; P.tm = p < 1 ? p : 2 - p; }
       else if (P.phase === 'pat') {
         P.wait -= dt; P.patArm = clamp(1 - P.wait / 0.8, 0, 1);
         if (P.wait <= 0) {
@@ -156,8 +159,8 @@ export function createPong(THREE, host) {
       if (P.splashT > 0) { P.splashT += dt; splash.scale.setScalar(1 + P.splashT * 5); splash.material.opacity = Math.max(0, 0.9 - P.splashT * 2.4); if (P.splashT > 0.4) { splash.visible = false; P.splashT = 0; } }
       // the reticle, and the first touch of a bounce shot
       const mine = P.turn === 'you' && (P.phase === 'aim' || P.phase === 'time');
-      aim.visible = mine; hop.visible = mine && P.bounce;
-      if (mine) { aim.position.set(P.rx + P.sx, TOP + CUP_H + 0.014, P.rz + P.sz); hop.position.set(P.rx * 0.3 + (P.rx + P.sx - P.rx * 0.3) * 0.55, TOP + 0.004, 0.75 + (P.rz + P.sz - 0.75) * 0.55); }
+      aim.visible = mine; hop.visible = false;
+      if (mine) aim.rotation.y = -(P.ang + P.sx);
       // Pat: idle sway, wind up and throw, and a swat when he blocks
       pat.g.position.y = Math.sin(P.t * 1.6) * 0.005; pat.g.rotation.y = Math.sin(P.t * 0.7) * 0.05;
       const f = P.fly, throwing = P.phase === 'pat' ? P.patArm : f && f.who === 'pat' && !f.out && f.t < 0.25 ? -1 : 0, swatting = f && f.who === 'you' && f.blocked && f.out && f.out.t < 0.4;
@@ -177,10 +180,10 @@ export function createPong(THREE, host) {
       if (P.msgT > 0) html += `<div class="g-msg" style="top:15%;font-size:28px">${P.msg}</div>`;
       if (over) html += `<div class="g-prompt" style="top:auto;bottom:70px">${host.touch ? 'REMATCH — play again · ✕ to walk away' : 'Click for a rematch · <kbd>E</kbd> to walk away'}</div>`;
       else if (mine) {
-        const pos = host.touch ? 'top:58px' : 'bottom:54px', zl = (0.5 - ZONE) * 100, zw = ZONE * 200;
-        html += `<div style="position:absolute;left:50%;${pos};transform:translateX(-50%);width:min(300px,70vw);height:16px;border-radius:999px;background:rgba(16,21,31,.85);border:1px solid rgba(255,255,255,.25);overflow:hidden"><i style="position:absolute;left:${zl}%;width:${zw}%;top:0;bottom:0;background:#2fae5c"></i>${P.phase === 'time' ? `<i style="position:absolute;left:calc(${P.tm * 100}% - 2px);width:4px;top:-2px;bottom:-2px;background:#fff"></i>` : ''}</div>`;
-        html += `<div class="g-prompt" style="top:auto;bottom:${host.touch ? 'auto;top:84px' : '80px'};font-size:12.5px">${P.bounce ? 'Bounce shot: worth 2 cups, but Pat can swat it' : 'Lob shot'}${host.touch ? '' : ' · <kbd>B</kbd> switches'}</div>`;
-        html += `<div class="g-tip">${host.touch ? 'Drag to aim · hold THROW, let go in the green' : P.phase === 'time' ? 'Let go while the marker is in the green' : 'Move the mouse to put the reticle on a cup · hold click, release in the green · B for a bounce shot · E walks away'}</div>`;
+        const pos = host.touch ? 'top:58px' : 'bottom:54px';
+        html += `<div style="position:absolute;left:50%;${pos};transform:translateX(-50%);width:min(320px,72vw)"><div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.7);margin-bottom:3px"><span>SHORT</span><span>POWER</span><span>LONG</span></div><div style="position:relative;height:16px;border-radius:999px;background:rgba(16,21,31,.85);border:1px solid rgba(255,255,255,.25);overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${(P.phase === 'time' ? P.tm : 0) * 100}%;background:linear-gradient(90deg,#2fae5c,#f2b441,#d64545)"></i>${P.lastPow !== null ? `<i title="last throw" style="position:absolute;left:calc(${P.lastPow * 100}% - 1px);width:2px;top:0;bottom:0;background:#fff;opacity:.85"></i>` : ''}</div></div>`;
+        html += `<div class="g-prompt" style="top:auto;bottom:${host.touch ? 'auto;top:100px' : '92px'};font-size:12.5px">${P.bounce ? 'Bounce shot: worth 2 cups, but Pat can swat it' : 'Lob shot'}${host.touch ? '' : ' · <kbd>B</kbd> switches'}</div>`;
+        html += `<div class="g-tip">${host.touch ? 'Drag to point the arrow · hold THROW and let go at the right power' : P.phase === 'time' ? 'Let go at the right power: the white tick is your last throw' : 'Mouse or A/D points the arrow · hold click and let go at the right power · B for a bounce shot · E walks away'}</div>`;
       } else if (P.phase === 'pat') html += `<div class="g-prompt" style="top:auto;bottom:70px">Pat is lining one up…</div>`;
       else if (P.phase === 'fly' && P.fly && P.fly.who === 'pat' && P.fly.bounce && !P.fly.out && !P.swatLock) html += `<div class="g-prompt" style="top:auto;bottom:70px">${host.touch ? 'Tap SWAT!' : 'Click to swat it!'}</div>`;
       return html;
