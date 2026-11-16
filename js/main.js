@@ -2,7 +2,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { createLacrosse, createRocket, createParkour, makeLacrosseStick, VEHICLES } from './games.js';
 import * as LB from './leaderboard.js';
 import { createGolf } from './golf.js';
-import { openGame as openCasinoGame } from './casino.js';
+import { openSlot } from './casino.js';
 
 const LINKS = {
   email: 'mmoore@college.harvard.edu',
@@ -730,7 +730,7 @@ function openPanel(html, onClose) {
 }
 function closePanel() {
   if (S.mode !== 'panel') return;
-  $('panel').classList.add('hidden'); S.mode = panelFrom;
+  $('panel').classList.add('hidden'); $('panel').classList.remove('dock'); $('back').textContent = 'Back to world'; S.mode = panelFrom;
   if (panelClose) panelClose(); panelClose = null;
   showWorldHud(panelFrom !== 'outside'); wobbleFilter(); lock();
 }
@@ -785,9 +785,19 @@ function goInside() {
 }
 // a seat at one of the casino's tables: the game runs in a panel over the room
 function openCasino(kind) {
-  let stop = null;
-  openPanel('<div id="czBody"></div>', () => stop?.());
-  stop = openCasinoGame(kind, $('czBody'));
+  if (kind === 'blackjack' || kind === 'roulette' || kind === 'holdem') {        // a seat at a 3D table, with a slim control dock
+    openPanel('<div id="czBody"></div>', () => golf.unseat());
+    $('panel').classList.add('dock'); $('back').textContent = 'Leave table';
+    golf.seat(kind, $('czBody'));
+  } else if (kind === 'slots7' || kind === 'moonshot') {
+    let alive = true; openPanel('<div id="czBody"></div>', () => { alive = false; });
+    openSlot(kind === 'moonshot' ? 'moonshot' : 's7', $('czBody'), () => alive);
+  } else if (kind === 'cashier') {
+    openPanel(`<h2>Cashier</h2>
+      <p>Chips here are free play money: they can’t be bought, and they can’t be cashed out. If you run out, the house spots you more.</p>
+      <p>If you enjoyed the place, you can tip the house on Venmo.</p>
+      <div class="row" style="justify-content:flex-start"><a class="btn" href="https://venmo.com/u/Matthew-moore04" target="_blank" rel="noopener">Tip on Venmo · @Matthew-moore04</a></div>`);
+  }
 }
 function golfFinish(r) {
   const total = r.card.reduce((a, v) => a + v, 0), par = r.pars.reduce((a, v) => a + v, 0), d = total - par;
@@ -1126,7 +1136,7 @@ function frame(now) {
     if (!S.paused) active.update(dt);
     renderer.render(active.scene, active.camera);
   } else if (golf && (S.mode === 'outside' || (S.mode === 'panel' && panelFrom === 'outside') || (S.mode === 'blackout' && blackFrom === 'outside'))) {
-    if (S.mode === 'outside' && !S.paused) golf.update(dt);
+    if ((S.mode === 'outside' && !S.paused) || (S.mode === 'panel' && golf.S.state === 'table')) golf.update(dt);      // a casino table keeps playing under its control dock
     renderer.render(golf.scene, golf.camera);
   } else { updateWorld(dt); renderer.render(scene, camera); }
   // "click to look" hint whenever the mouse is free but you are walking or playing
