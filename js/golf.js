@@ -492,10 +492,25 @@ export function createGolf(THREE, ctx) {
       cyl(G2, 0.02, 0.02, 0.4, 0xc0c0c0, 0.46, 1.25, 0.1, 8); sph(G2, 0.05, 0xc0262d, 0.46, 1.47, 0.1);
       add(new THREE.PlaneGeometry(0.78, 0.26), new THREE.MeshBasicMaterial({ map: k < 0 ? topS7 : topMoon }), 0, 1.9, 0.0, G2); bx(G2, 0.84, 0.3, 0.06, gold, 0, 1.9, -0.035); }
     // the cashier's cage on the back wall
-    bx(casG, 5.2, 1.1, 0.7, wood, 0, 0.55, -HD + 0.6); bx(casG, 5.4, 0.08, 0.8, gold, 0, 1.14, -HD + 0.6); for (let i = -6; i <= 6; i++) cyl(casG, 0.022, 0.022, 1.5, gold, i * 0.4, 1.93, -HD + 0.6, 6);
+    bx(casG, 5.2, 1.1, 0.7, wood, 0, 0.55, -HD + 0.6); bx(casG, 5.4, 0.08, 0.8, gold, 0, 1.14, -HD + 0.6); for (let i = -6; i <= 6; i++) if (Math.abs(i) > 1) cyl(casG, 0.022, 0.022, 1.5, gold, i * 0.4, 1.93, -HD + 0.6, 6);       // bars, with an open teller window in the middle
+    for (const k of [-1, 1]) bx(casG, 0.1, 1.5, 0.12, gold, k * 0.62, 1.93, -HD + 0.6); bx(casG, 1.34, 0.1, 0.12, gold, 0, 2.3, -HD + 0.6);
     bx(casG, 5.4, 0.12, 0.14, gold, 0, 2.7, -HD + 0.6);
     { const teller = makePerson(THREE, { top: 0xf6f3ec, vest: 0x1f4e2f, bowtie: 0x17191d, legs: 0x17191d, hair: 0x8a5a2b, hairStyle: 'bun' }); teller.g.position.set(0, 0, -HD + 0.15); casG.add(teller.g); casPeople.push(teller);
-      const vs = add(new THREE.PlaneGeometry(0.9, 0.36), new THREE.MeshBasicMaterial({ map: canvasTex(256, 102, (c, W, H) => { c.fillStyle = '#008cff'; c.beginPath(); c.roundRect(0, 0, W, H, 16); c.fill(); c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 34px Arial, sans-serif'; c.fillText('Tip the house', W / 2, 36); c.font = '24px Arial, sans-serif'; c.fillText('Venmo @Matthew-moore04', W / 2, 74); }) }), 1.6, 1.42, -HD + 0.96, casG); vs.rotation.x = -0.25; }
+      // a lit tip sign standing on the counter, and a tip jar beside the window
+      const tipT = canvasTex(512, 256, (c, W, H) => {
+        const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1a9bff'); g.addColorStop(1, '#0074d9'); c.fillStyle = g; c.beginPath(); c.roundRect(0, 0, W, H, 26); c.fill();
+        c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 6; c.beginPath(); c.roundRect(10, 10, W - 20, H - 20, 20); c.stroke();
+        c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 70px Arial, sans-serif'; c.fillText('Tip the house', W / 2, 92);
+        c.fillStyle = '#fff'; c.beginPath(); c.roundRect(58, 150, 52, 52, 12); c.fill(); c.fillStyle = '#008cff'; c.font = 'italic 900 40px Arial, sans-serif'; c.fillText('V', 84, 178);
+        c.fillStyle = '#fff'; c.textAlign = 'left'; c.font = 'bold 40px Arial, sans-serif'; c.fillText('@Matthew-moore04', 126, 178); });
+      const st = new THREE.Group(); st.position.set(-1.25, 1.18, -HD + 0.82); st.rotation.y = 0.25; casG.add(st);
+      add(new THREE.PlaneGeometry(0.84, 0.42), new THREE.MeshBasicMaterial({ map: tipT }), 0, 0.27, 0.012, st); bx(st, 0.9, 0.48, 0.02, 0x17191d, 0, 0.27, 0); bx(st, 0.3, 0.04, 0.16, gold, 0, 0.02, -0.02);
+      const jar = new THREE.Group(); jar.position.set(1.0, 1.18, -HD + 0.78); casG.add(jar);
+      cyl(jar, 0.11, 0.1, 0.24, new THREE.MeshLambertMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.35 }), 0, 0.12, 0, 20); cyl(jar, 0.115, 0.115, 0.03, gold, 0, 0.245, 0, 20);
+      for (const [x, y, z, r] of [[-0.03, 0.04, 0.02, 0.3], [0.03, 0.07, -0.02, -0.4], [0, 0.1, 0.03, 0.9]]) { const bill = bx(jar, 0.14, 0.012, 0.07, 0x5fae6b, x, y, z); bill.rotation.set(0.3, r, 0.2); }
+      for (let i = 0; i < 4; i++) cyl(jar, 0.025, 0.025, 0.006, gold, (i - 1.5) * 0.04, 0.02 + i * 0.004, 0.05, 12);
+      const jl = canvasTex(256, 64, (c, W, H) => { c.fillStyle = '#fbf8f0'; c.beginPath(); c.roundRect(0, 0, W, H, 10); c.fill(); c.fillStyle = '#17191d'; c.font = 'bold 36px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('TIPS', W / 2, H / 2 + 2); });
+      add(new THREE.PlaneGeometry(0.16, 0.04), new THREE.MeshBasicMaterial({ map: jl }), 0, 0.14, 0.112, jar); }
     add(new THREE.PlaneGeometry(3, 0.6), new THREE.MeshBasicMaterial({ map: canvasTex(512, 102, (c, W, H) => { c.fillStyle = '#17191d'; c.fillRect(0, 0, W, H); c.shadowColor = '#ffd76a'; c.shadowBlur = 14; c.fillStyle = '#ffe9a8'; c.font = 'bold 60px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; for (let i = 0; i < 2; i++) c.fillText('CASHIER', W / 2, H / 2 + 3); }) }), 0, 3.15, -HD + 0.08, casG);
     // the door back to the street
     bx(casG, 3.0, 3.1, 0.12, gold, 0, 1.55, HD - 0.05); for (const k of [-1, 1]) bx(casG, 1.3, 2.9, 0.1, 0x3a0f16, k * 0.68, 1.45, HD - 0.1);
@@ -518,7 +533,7 @@ export function createGolf(THREE, ctx) {
     else if (Math.hypot(S.bx, S.bz - 0.1) < 1.9) S.prompt = { k: 'roulette', t: 'Play roulette' };
     else if (Math.hypot(S.bx - 5.3, S.bz - 0.3) < 1.9) S.prompt = { k: 'holdem', t: 'Sit down for Texas hold’em' };
     else if (Math.abs(S.bx) > CIN.hw - 2.1 && S.bz > 1.0 && S.bz < 6.0) S.prompt = S.bx < 0 ? { k: 'slots7', t: 'Play Lucky 7s' } : { k: 'moonshot', t: 'Play Moonshot' };
-    else if (Math.abs(S.bx) < 2.6 && S.bz < -CIN.hd + 2.4) S.prompt = { k: 'cashier', t: 'Cashier' };
+    else if (Math.abs(S.bx) < 2.6 && S.bz < -CIN.hd + 2.4) S.prompt = { k: 'cashier', t: 'Cashier — tip the house' };
     for (const p of casPeople) { p.head.rotation.y = Math.sin(S.t * 0.6 + p.g.position.x) * 0.25; p.g.position.y += (Math.sin(S.t * 1.5 + p.g.position.x) * 0.0003); }
     tables.idle(dt, S.t);
     let html = `<div class="g-top"><div class="pill">Story St. Casino</div><div class="pill">Chips: ${chips().toLocaleString('en-US')}</div></div>`;

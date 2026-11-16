@@ -730,7 +730,7 @@ function openPanel(html, onClose) {
 }
 function closePanel() {
   if (S.mode !== 'panel') return;
-  $('panel').classList.add('hidden'); $('panel').classList.remove('dock'); $('back').textContent = 'Back to world'; S.mode = panelFrom;
+  $('panel').classList.add('hidden'); $('panel').classList.remove('dock', 'wide', 'tipjar'); $('back').textContent = 'Back to world'; S.mode = panelFrom;
   if (panelClose) panelClose(); panelClose = null;
   showWorldHud(panelFrom !== 'outside'); wobbleFilter(); lock();
 }
@@ -790,13 +790,16 @@ function openCasino(kind) {
     $('panel').classList.add('dock'); $('back').textContent = 'Leave table';
     golf.seat(kind, $('czBody'));
   } else if (kind === 'slots7' || kind === 'moonshot') {
-    let alive = true; openPanel('<div id="czBody"></div>', () => { alive = false; });
+    let alive = true; openPanel('<div id="czBody"></div>', () => { alive = false; }); $('panel').classList.add('wide');
     openSlot(kind === 'moonshot' ? 'moonshot' : 's7', $('czBody'), () => alive);
   } else if (kind === 'cashier') {
-    openPanel(`<h2>Cashier</h2>
-      <p>Chips here are free play money: they can’t be bought, and they can’t be cashed out. If you run out, the house spots you more.</p>
-      <p>If you enjoyed the place, you can tip the house on Venmo.</p>
-      <div class="row" style="justify-content:flex-start"><a class="btn" href="https://venmo.com/u/Matthew-moore04" target="_blank" rel="noopener">Tip on Venmo · @Matthew-moore04</a></div>`);
+    openPanel(`<div class="tipcard">
+        <div class="tiphead"><div><small>Story St. Casino · Cashier</small><h2>Tip the house</h2></div></div>
+        <p>Had fun? Tips go straight to Matthew on Venmo, as a thank-you for building the place.</p>
+        <a class="venmo" href="https://venmo.com/u/Matthew-moore04" target="_blank" rel="noopener"><span class="vlogo">V</span><span><b>@Matthew-moore04</b><small>Open in Venmo</small></span><span class="arr">→</span></a>
+        <div class="tipnote">Tips are optional and don’t buy chips. Chips here are always free play money: they can’t be bought or cashed out, and the house spots you more if you run out.</div>
+      </div>`);
+    $('panel').classList.add('tipjar');
   }
 }
 function golfFinish(r) {

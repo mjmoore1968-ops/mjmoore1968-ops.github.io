@@ -86,75 +86,112 @@ export function createTables(THREE, host) {
     cam.off += (want - cam.off) * Math.min(1, dt * 6); camera.setViewOffset(innerWidth, innerHeight, 0, cam.off, innerWidth, innerHeight);
   }
 
-  /* ================================================ BLACKJACK */
+  /* ================================================ BLACKJACK (with splits, up to four hands) */
   const bjG = new THREE.Group(); bjG.position.set(-5.2, 0, -1.7); casG.add(bjG);
   const BY = 0.99, SHOE = { x: 0.95, y: 1.08, z: -0.3, ry: 0.4 }, MUCK = { x: -1.0, y: 1.0, z: -0.32 };
-  const bjBet = chipStack(bjG, 0, BY, 0.66);
-  const BJ = { phase: 'bet', bet: 0, lastBet: 25, me: [], dl: [], cards: [], deck: freshDeck(), msg: '', cls: '', doubled: false, bank: 0 };
+  const bjStacks = [0, 1, 2, 3].map(() => chipStack(bjG, 0, BY, 0.66));
+  const BJ = { phase: 'bet', bet: 0, base: 25, hands: [], cur: 0, dl: [], cards: [], deck: freshDeck(), msg: '', cls: '', bank: 0 };
   const bjVal = h => { let t = 0, a = 0; for (const c of h) { if (c.r === 12) { a++; t += 11; } else t += c.r >= 8 ? 10 : c.r + 2; } while (t > 21 && a) { t -= 10; a--; } return { t, soft: a > 0 }; };
+  const cardVal = c => (c.r === 12 ? 11 : c.r >= 8 ? 10 : c.r + 2);
   const bjDraw = () => { if (BJ.deck.length < 15) BJ.deck = freshDeck(); return BJ.deck.pop(); };
-  const bjSpot = (who, i) => (who === 'me' ? { x: -0.07 + i * 0.05, y: BY + 0.0013 * i, z: 0.44 - i * 0.025, ry: 0 } : { x: -0.12 + i * 0.105, y: BY, z: -0.1, ry: 0 });
+  const handX = h => (h - (BJ.hands.length - 1) / 2) * 0.3;
+  const bjSpot = (who, i, h = 0) => (who === 'me' ? { x: handX(h) - 0.05 + i * 0.045, y: BY + 0.0013 * i, z: 0.44 - i * 0.022, ry: 0 } : { x: -0.12 + i * 0.105, y: BY, z: -0.1, ry: 0 });
+  const canSplit = hd => hd && hd.cards.length === 2 && cardVal(hd.cards[0]) === cardVal(hd.cards[1]) && BJ.hands.length < 4 && BJ.bank >= hd.bet;
+  const holeCard = () => BJ.cards.find(c => c.who === 'dl' && c.g.rotation.z > 1);
   let bjArm = 0;
-  async function bjGive(who, up) {
-    const g = gen, c = bjDraw(), hand = who === 'me' ? BJ.me : BJ.dl, i = hand.length, card = makeCard(c, bjG, SHOE);
-    hand.push(c); BJ.cards.push(card); card.who = who; bjArm = 0.35;
-    await move(card, bjSpot(who, i), 0.4, { up, arc: 0.05 }); return g === gen ? card : null;
+  function bjBets() { BJ.hands.forEach((hd, h) => { bjStacks[h].position.set(handX(h) + (BJ.hands.length > 1 ? 0 : 0), BY, 0.66); stackTo(bjStacks[h], hd.bet); }); for (let h = BJ.hands.length; h < 4; h++) stackTo(bjStacks[h], 0); }
+  async function bjGive(who, up, h = 0) {
+    const g = gen, c = bjDraw(), hand = who === 'me' ? BJ.hands[h].cards : BJ.dl, i = hand.length, card = makeCard(c, bjG, SHOE);
+    hand.push(c); BJ.cards.push(card); card.who = who; card.h = h; if (who === 'me') BJ.hands[h].objs.push(card); bjArm = 0.35;
+    await move(card, bjSpot(who, i, h), 0.4, { up, arc: 0.05 }); return g === gen ? card : null;
   }
   function bjRender() {
-    const B = BJ, mv = B.me.length ? bjVal(B.me) : null, dv = B.dl.length ? bjVal(B.phase === 'play' || B.phase === 'dealing' ? [B.dl[0]] : B.dl) : null;
-    const stat = `<div class="stat"><span>Chips <b>${money(B.bank)}</b></span><span>Bet <b>${money(B.bet)}</b></span>${mv ? `<span>You <b>${mv.soft && mv.t < 21 ? 'soft ' : ''}${mv.t}</b></span>` : ''}${dv ? `<span>Dealer <b>${dv.t}${B.phase === 'play' ? ' + ?' : ''}</b></span>` : ''}</div>`;
+    const B = BJ, hd = B.hands[B.cur], dv = B.dl.length ? bjVal(holeCard() ? [B.dl[0]] : B.dl) : null, many = B.hands.length > 1;
+    const yours = B.hands.map((x, h) => { const v = bjVal(x.cards); return x.cards.length ? `<span>${many ? `Hand ${h + 1}` : 'You'} <b>${v.soft && v.t < 21 ? 'soft ' : ''}${v.t}</b>${many && h === B.cur && B.phase === 'play' ? ' ◀' : ''}</span>` : ''; }).join('');
+    const stake = B.phase === 'bet' ? B.bet : B.hands.reduce((a, x) => a + x.bet, 0);
+    const stat = `<div class="stat"><span>Chips <b>${money(B.bank)}</b></span><span>Bet <b>${money(stake)}</b></span>${yours}${dv ? `<span>Dealer <b>${dv.t}${holeCard() ? ' + ?' : ''}</b></span>` : ''}</div>`;
     let ctl = '';
     if (B.phase === 'bet') ctl = `${[5, 10, 25, 50, 100].map(v => `<button class="chip c${v}" data-a="c${v}">${v}</button>`).join('')}<button class="btn ghost small" data-a="clear">Clear</button><button class="btn small" data-a="deal"${B.bet ? '' : ' disabled'}>Deal</button>`;
-    else if (B.phase === 'play') ctl = `<button class="btn small" data-a="hit">Hit</button><button class="btn small" data-a="stand">Stand</button><button class="btn ghost small" data-a="double"${B.me.length === 2 && B.bank >= B.bet ? '' : ' disabled'}>Double</button>`;
+    else if (B.phase === 'play') ctl = `<button class="btn small" data-a="hit">Hit</button><button class="btn small" data-a="stand">Stand</button><button class="btn ghost small" data-a="double"${hd.cards.length === 2 && B.bank >= hd.bet ? '' : ' disabled'}>Double</button><button class="btn ghost small" data-a="split"${canSplit(hd) ? '' : ' disabled'}>Split</button>`;
     else if (B.phase === 'done') ctl = '<button class="btn small" data-a="next">Next hand</button>';
     else ctl = '<span style="color:var(--dim)">Dealing…</span>';
     dock(`<h2>Blackjack</h2>${stat}<div class="msg ${B.cls}">${B.msg}</div><div class="row">${ctl}</div>
-      <details><summary>How to play</summary><ul><li>Beat the dealer without going over 21. Face cards count 10, aces 1 or 11.</li><li><b>Hit</b> takes a card, <b>Stand</b> keeps your total, <b>Double</b> doubles your bet for exactly one more card.</li><li>The dealer draws to 17. A two-card 21 is blackjack and pays 3 to 2.</li></ul></details>`);
+      <details><summary>How to play</summary><ul><li>Beat the dealer without going over 21. Face cards count 10, aces 1 or 11.</li><li><b>Hit</b> takes a card, <b>Stand</b> keeps your total, <b>Double</b> doubles your bet for exactly one more card.</li><li><b>Split</b>: when your first two cards match in value, split them into two hands with a second bet, and play each hand on its own. You can split up to four hands. Split aces get one card each.</li><li>The dealer draws to 17. A two-card 21 is blackjack and pays 3 to 2 (not after a split).</li></ul></details>`);
   }
-  function bjEnd(m, cls, pay) {
-    const B = BJ; B.bank += pay; setChips(B.bank); B.msg = m; B.cls = cls; B.phase = 'done'; B.lastBet = B.doubled ? B.bet / 2 : B.bet;
+  function bjEnd(m, cls, pays) {
+    const B = BJ, pay = pays.reduce((a, v) => a + v, 0); B.bank += pay; setChips(B.bank); B.msg = m; B.cls = cls; B.phase = 'done';
     if (B.bank <= 0) { B.bank = 500; setChips(500); B.msg += ' You are out of chips, so the house spots you 500.'; }
-    stackTo(bjBet, pay); bjRender();
-    for (const c of B.cards) if (c.who === 'dl' && c.g.rotation.z > 1) flip(c);      // the dealer always shows the hole card at the end
+    pays.forEach((v, h) => stackTo(bjStacks[h], v)); bjRender();
+    const hole = holeCard(); if (hole) flip(hole);                                       // the dealer always shows the hole card at the end
   }
   function bjSettle() {
-    const B = BJ, m = bjVal(B.me).t, d = bjVal(B.dl).t;
-    if (m > 21) bjEnd(`Bust with ${m}. You lose ${money(B.bet)}.`, 'lose', 0);
-    else if (d > 21) bjEnd(`Dealer busts with ${d}. You win ${money(B.bet)}.`, 'win', B.bet * 2);
-    else if (m > d) bjEnd(`${m} beats ${d}. You win ${money(B.bet)}.`, 'win', B.bet * 2);
-    else if (m < d) bjEnd(`Dealer’s ${d} beats your ${m}. You lose ${money(B.bet)}.`, 'lose', 0);
-    else bjEnd(`Push at ${m}. Your bet comes back.`, '', B.bet);
+    const B = BJ, d = bjVal(B.dl).t, pays = [], res = [];
+    for (const hd of B.hands) {
+      const m = bjVal(hd.cards).t;
+      if (m > 21) { pays.push(0); res.push(['lose', `bust with ${m}`]); }
+      else if (d > 21 || m > d) { pays.push(hd.bet * 2); res.push(['win', d > 21 ? `dealer busts` : `${m} beats ${d}`]); }
+      else if (m < d) { pays.push(0); res.push(['lose', `${m} loses to ${d}`]); }
+      else { pays.push(hd.bet); res.push(['push', `push at ${m}`]); }
+    }
+    const staked = B.hands.reduce((a, x) => a + x.bet, 0), net = pays.reduce((a, v) => a + v, 0) - staked, cls = net > 0 ? 'win' : net < 0 ? 'lose' : '';
+    if (B.hands.length === 1) {
+      const [r, why] = res[0], hb = B.hands[0].bet, cap = why[0].toUpperCase() + why.slice(1);
+      return bjEnd(r === 'win' ? `${cap}. You win ${money(hb)}.` : r === 'lose' ? `${cap}. You lose ${money(hb)}.` : `${cap}. Your bet comes back.`, cls, pays);
+    }
+    bjEnd(`${res.map(([r, why], h) => `Hand ${h + 1}: ${r === 'win' ? 'win' : r === 'lose' ? 'lose' : 'push'} (${why})`).join(' · ')}. ${net > 0 ? `Up ${money(net)}.` : net < 0 ? `Down ${money(-net)}.` : 'Even.'}`, cls, pays);
   }
   async function bjDealer() {
     const g = gen, B = BJ; B.phase = 'dealer'; bjRender();
-    const hole = B.cards.find(c => c.who === 'dl' && c.g.rotation.z > 1); if (hole) await flip(hole); if (g !== gen) return;
-    if (bjVal(B.me).t <= 21) while (bjVal(B.dl).t < 17) { await sleep(350); if (g !== gen) return; await bjGive('dl', true); if (g !== gen) return; bjRender(); }
+    const hole = holeCard(); if (hole) await flip(hole); if (g !== gen) return;
+    if (B.hands.some(hd => bjVal(hd.cards).t <= 21)) while (bjVal(B.dl).t < 17) { await sleep(350); if (g !== gen) return; await bjGive('dl', true); if (g !== gen) return; bjRender(); }
     await sleep(250); if (g !== gen) return; bjSettle();
   }
+  // move on to hand h (giving a split hand its second card), or to the dealer when every hand is done
+  async function bjPlay(h) {
+    const g = gen, B = BJ;
+    for (; h < B.hands.length; h++) {
+      const hd = B.hands[h]; B.cur = h;
+      if (hd.cards.length === 1) { B.phase = 'dealing'; bjRender(); await bjGive('me', true, h); if (g !== gen) return; }
+      if (hd.splitAces || bjVal(hd.cards).t >= 21) continue;
+      B.phase = 'play'; bjRender(); return;
+    }
+    return bjDealer();
+  }
+  async function bjReflow() {                             // after a split, slide every hand into its new place
+    const B = BJ; await Promise.all(B.hands.flatMap((hd, h) => hd.objs.map((card, i) => move(card, bjSpot('me', i, h), 0.3, { arc: 0.02 })))); bjBets();
+  }
   async function bjAct(a) {
-    const B = BJ, g = gen;
+    const B = BJ, g = gen, hd = B.hands[B.cur];
     if (B.phase === 'bet') {
-      if (a[0] === 'c') { const v = +a.slice(1); if (B.bet + v <= B.bank) B.bet += v; else B.msg = 'Not enough chips for that.'; stackTo(bjBet, B.bet); }
-      else if (a === 'clear') { B.bet = 0; stackTo(bjBet, 0); }
+      if (a[0] === 'c') { const v = +a.slice(1); if (B.bet + v <= B.bank) B.bet += v; else B.msg = 'Not enough chips for that.'; stackTo(bjStacks[0], B.bet); bjStacks[0].position.set(0, BY, 0.66); }
+      else if (a === 'clear') { B.bet = 0; stackTo(bjStacks[0], 0); }
       else if (a === 'deal' && B.bet > 0) {
-        B.bank -= B.bet; setChips(B.bank); B.doubled = false; B.phase = 'dealing'; B.msg = ''; B.cls = ''; bjRender();
+        B.bank -= B.bet; setChips(B.bank); B.base = B.bet; B.hands = [{ cards: [], objs: [], bet: B.bet }]; B.cur = 0; bjBets(); B.phase = 'dealing'; B.msg = ''; B.cls = ''; bjRender();
         for (const [w, up] of [['me', true], ['dl', true], ['me', true], ['dl', false]]) { await bjGive(w, up); if (g !== gen) return; await sleep(90); }
-        bjRender(); const mb = bjVal(B.me).t === 21, peek = B.dl[0].r >= 8, db = bjVal(B.dl).t === 21;
-        if (mb || (peek && db)) { const hole = B.cards.find(c => c.who === 'dl' && c.g.rotation.z > 1); if (hole) await flip(hole); if (g !== gen) return;
-          if (mb && db) return bjEnd('Both have blackjack. Push.', '', B.bet); if (mb) return bjEnd(`Blackjack! You win ${money(B.bet * 1.5)}.`, 'win', B.bet * 2.5); return bjEnd('Dealer has blackjack. You lose.', 'lose', 0); }
+        bjRender(); const mb = bjVal(B.hands[0].cards).t === 21, peek = B.dl[0].r >= 8, db = bjVal(B.dl).t === 21;
+        if (mb || (peek && db)) { const hole = holeCard(); if (hole) await flip(hole); if (g !== gen) return; const b = B.hands[0].bet;
+          if (mb && db) return bjEnd('Both have blackjack. Push.', '', [b]); if (mb) return bjEnd(`Blackjack! You win ${money(b * 1.5)}.`, 'win', [b * 2.5]); return bjEnd('Dealer has blackjack. You lose.', 'lose', [0]); }
         B.phase = 'play';
       }
     } else if (B.phase === 'play') {
-      if (a === 'hit') { B.phase = 'dealing'; bjRender(); await bjGive('me', true); if (g !== gen) return; B.phase = 'play'; const t = bjVal(B.me).t; if (t > 21) return bjSettle(); if (t === 21) return bjDealer(); }
-      else if (a === 'stand') return bjDealer();
-      else if (a === 'double' && B.me.length === 2 && B.bank >= B.bet) { B.bank -= B.bet; setChips(B.bank); B.bet *= 2; B.doubled = true; stackTo(bjBet, B.bet); B.phase = 'dealing'; bjRender(); await bjGive('me', true); if (g !== gen) return; if (bjVal(B.me).t > 21) return bjSettle(); return bjDealer(); }
+      if (a === 'hit') { B.phase = 'dealing'; bjRender(); await bjGive('me', true, B.cur); if (g !== gen) return; if (bjVal(hd.cards).t >= 21) return bjPlay(B.cur + 1); B.phase = 'play'; }
+      else if (a === 'stand') return bjPlay(B.cur + 1);
+      else if (a === 'double' && hd.cards.length === 2 && B.bank >= hd.bet) { B.bank -= hd.bet; setChips(B.bank); hd.bet *= 2; bjBets(); B.phase = 'dealing'; bjRender(); await bjGive('me', true, B.cur); if (g !== gen) return; return bjPlay(B.cur + 1); }
+      else if (a === 'split' && canSplit(hd)) {
+        B.bank -= hd.bet; setChips(B.bank); const aces = hd.cards[0].r === 12;
+        const moved = { cards: [hd.cards.pop()], objs: [hd.objs.pop()], bet: hd.bet, splitAces: aces }; hd.splitAces = aces; moved.objs[0].h = B.cur + 1;
+        B.hands.splice(B.cur + 1, 0, moved); B.phase = 'dealing'; B.msg = aces ? 'Split aces: one card each.' : ''; bjRender();
+        await bjReflow(); if (g !== gen) return;
+        await bjGive('me', true, B.cur); if (g !== gen) return; bjRender();
+        return aces ? bjPlay(B.cur + 1) : bjPlay(B.cur);
+      }
     } else if (B.phase === 'done' && a === 'next') {
       B.phase = 'clearing'; bjRender(); await Promise.all(B.cards.map((c, i) => sleep(i * 40).then(() => move(c, { x: MUCK.x, y: MUCK.y + i * 0.001, z: MUCK.z, ry: 0.3 }, 0.35, { up: false })))); if (g !== gen) return;
-      bjClear(); B.bet = Math.min(B.lastBet, B.bank); stackTo(bjBet, B.bet); B.phase = 'bet'; B.msg = 'Place your bet.';
+      bjClear(); B.bet = Math.min(B.base, B.bank); stackTo(bjStacks[0], B.bet); bjStacks[0].position.set(0, BY, 0.66); B.phase = 'bet'; B.msg = 'Place your bet.';
     }
     bjRender();
   }
-  function bjClear() { for (const c of BJ.cards) bjG.remove(c.g); BJ.cards = []; BJ.me = []; BJ.dl = []; }
+  function bjClear() { for (const c of BJ.cards) bjG.remove(c.g); BJ.cards = []; BJ.hands = []; BJ.dl = []; BJ.cur = 0; for (const s of bjStacks) stackTo(s, 0); }
 
   /* ================================================ ROULETTE */
   const rlG = new THREE.Group(); rlG.position.set(0, 0, -1.8); casG.add(rlG);
@@ -380,13 +417,13 @@ export function createTables(THREE, host) {
     enter(kind, el) {
       css(); if (!tagCss) { tagCss = true; const s = document.createElement('style'); s.textContent = '.mrow{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:4px 0 2px;font-size:13px;color:var(--dim)}.mrow .mc{display:inline-block;min-width:34px;padding:4px 5px;border-radius:6px;background:#fbf8f0;color:#15171c;font:700 16px Georgia,serif;text-align:center}.mrow .mc.red{color:#c0262d}.tbltag{position:absolute;transform:translate(-50%,-100%);background:rgba(12,14,20,.82);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:4px 9px;font-size:12.5px;line-height:1.3;text-align:center;white-space:nowrap;pointer-events:none}.tbltag b{color:#ffd76a}.tbltag.turn{border-color:#f2b441;box-shadow:0 0 0 1px #f2b441}.tbltag.out{opacity:.45}.tbltag.total{font-size:15px;font-weight:700;transform:translate(-50%,-50%)}'; document.head.appendChild(s); }
       seat = kind; gen++; clearTweens(); cam.snap = true;
-      if (kind === 'blackjack') { bindDock(el, bjAct); bjClear(); Object.assign(BJ, { bank: chips(), phase: 'bet', bet: 0, msg: 'Place your bet.', cls: '' }); stackTo(bjBet, 0); bjRender(); }
+      if (kind === 'blackjack') { bindDock(el, bjAct); bjClear(); Object.assign(BJ, { bank: chips(), phase: 'bet', bet: 0, msg: 'Place your bet.', cls: '' }); bjRender(); }
       else if (kind === 'roulette') { bindDock(el, rlAct); Object.assign(RL, { bank: chips(), bets: {}, spin: null, result: null, msg: 'Pick a chip, tap the board, then spin.', cls: '' }); rlStacks(); rlRender(); }
       else { bindDock(el, pkAct); PK.P[0].stack = chips(); pkLeave(); pkRender(); }
     },
     leave() {
       if (!seat) return; gen++; clearTweens();
-      if (seat === 'blackjack') { bjClear(); stackTo(bjBet, 0); if (BJ.phase !== 'bet' && BJ.phase !== 'done') { BJ.phase = 'bet'; } }
+      if (seat === 'blackjack') { bjClear(); BJ.phase = 'bet'; BJ.bet = 0; }
       else if (seat === 'roulette') { if (RL.spin) { RL.spin = null; } RL.bank += rlTotal(); RL.bets = {}; setChips(RL.bank); rlStacks(); }
       else pkLeave();
       seat = null; dockEl = dockFn = null; cam.off = 0; camera.clearViewOffset();
@@ -404,8 +441,9 @@ export function createTables(THREE, host) {
       let html = '';
       if (seat === 'blackjack') {
         aimCamera(bjG, 0, 1.44, 1.16, 0, 1.02, -0.08, dt, 54);
-        const B = BJ; if (B.me.length) { const v = bjVal(B.me); html += tag(bjG, 0.03, BY + 0.02, 0.56, `${v.t}`, 'total'); }
-        if (B.dl.length) { const v = bjVal(B.phase === 'play' || (B.phase === 'dealing' && B.dl.length === 2 && B.cards.some(c => c.who === 'dl' && c.g.rotation.z > 1)) ? [B.dl[0]] : B.dl); html += tag(bjG, -0.12 + B.dl.length * 0.105, BY + 0.02, -0.1, `${v.t}`, 'total'); }
+        const B = BJ, many = B.hands.length > 1;
+        B.hands.forEach((hd, h) => { if (hd.cards.length) { const v = bjVal(hd.cards); html += tag(bjG, handX(h) + 0.03, BY + 0.02, 0.56, `${many ? `<small>Hand ${h + 1}</small> ` : ''}${v.t}`, `total${many && h === B.cur && B.phase === 'play' ? ' turn' : ''}`); } });
+        if (B.dl.length) { const v = bjVal(holeCard() ? [B.dl[0]] : B.dl); html += tag(bjG, -0.12 + B.dl.length * 0.105, BY + 0.02, -0.1, `${v.t}`, 'total'); }
         html += `<div class="g-top"><div class="pill">Blackjack</div><div class="pill">Chips: ${money(B.bank)}</div></div>`;
       } else if (seat === 'roulette') {
         if (RL.spin) aimCamera(rlG, WC.x + 0.05, 1.72, 0.66, WC.x, 1.1, -0.04, dt, 50);

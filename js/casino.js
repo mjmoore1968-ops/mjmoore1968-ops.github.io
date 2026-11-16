@@ -82,6 +82,14 @@ const CSS = `
 .slot .reel .cell.win{background:rgba(255,215,106,.45);border-radius:6px}
 .slot .spin{min-width:110px;font-size:16px}
 .slot table.pay{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.slot table.pay td{padding:3px 6px;border-bottom:1px solid var(--line)}.slot table.pay td:last-child{text-align:right;color:var(--ink)}
+.slotwrap{display:flex;gap:18px;align-items:flex-start}.slotwrap .machine{flex:1 1 auto;min-width:0}
+.paycard{flex:0 0 250px;margin-top:40px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:13px}
+.paycard h3{margin:0 0 4px;font:700 15px Georgia,serif;color:var(--ink)}.paycard p{margin:0 0 6px;color:var(--dim);line-height:1.4}.paycard p.fine{margin:8px 0 0;font-size:12px}
+.paycard table.pay{margin:0}.paycard table.pay td{padding:4px 4px;white-space:nowrap}.paycard td.sy{font-size:15px;letter-spacing:1px}.paycard td.nt{color:var(--dim);font-size:12px}.paycard tr.hd td{color:var(--dim);font-size:11.5px;text-align:right}
+.paycard b{color:var(--amber)}.paycard small{color:var(--dim);font-size:10.5px}
+.paycard i.s7{font:900 15px Georgia,serif;color:#e04a52;font-style:normal;margin-right:2px}.paycard i.bar{font:900 9.5px Arial,sans-serif;font-style:normal;background:#15171c;color:#fff;border-radius:3px;padding:1px 3px;margin-right:2px;border:1px solid #555}
+#panel.wide .box{max-width:940px;width:calc(100% - 24px)}
+@media (max-width:760px){.slotwrap{flex-direction:column;gap:6px}.paycard{flex:none;width:100%;margin-top:4px;box-sizing:border-box}}
 @media (max-width:560px){.cz .rc{height:22px;font-size:10.5px}.cz .rgrid{grid-template-columns:22px repeat(12,1fr);gap:2px}.slot .cell{font-size:30px}.slot.moon .cell{font-size:24px}.slot .marquee{font-size:22px}}
 /* the table dock: a slim bar over the 3D table */
 #panel.dock{background:none;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:flex-end;pointer-events:none;padding:10px}
@@ -137,18 +145,30 @@ export function openSlot(kind, el, live) {
   css();
   const moon = kind === 'moonshot', REELS = moon ? 5 : 3, ROWS = 3, H = moon ? 58 : 70, syms = moon ? MS : S7, bets = moon ? [5, 10, 25, 50] : [5, 10, 25, 50];
   let bank = chips(), bet = 10, busy = false, free = 0, last = Array.from({ length: REELS }, () => Array.from({ length: ROWS }, () => pickW(syms))), win = 0, msg = moon ? 'Five lines. 🚀 is wild. Three 🪐 anywhere start free spins.' : 'Line them up across the red line.';
-  el.innerHTML = `<div class="cz slot ${moon ? 'moon' : 's7'}"><div class="cab"><div class="marquee">${moon ? 'MOONSHOT' : 'LUCKY 7s'}</div>
-    <div class="glass">${Array.from({ length: REELS }, (_, i) => `<div class="reel" style="height:${H * ROWS}px"><div class="strip" id="st${i}"></div></div>`).join('')}<div class="line"></div></div>
+  el.innerHTML = `<div class="cz slot ${moon ? 'moon' : 's7'}"><div class="slotwrap"><div class="machine"><div class="cab"><div class="marquee">${moon ? 'MOONSHOT' : 'LUCKY 7s'}</div>
+    <div class="glass">${Array.from({ length: REELS }, (_, i) => `<div class="reel" style="height:${H * ROWS}px"><div class="strip" id="st${i}"></div></div>`).join('')}${moon ? '<div class="line"></div><div class="line" style="top:16.7%;opacity:.35;height:2px"></div><div class="line" style="top:83.3%;opacity:.35;height:2px"></div>' : '<div class="line"></div>'}</div>
     <div class="lcd"><span id="slWin">WIN 0</span><span id="slFree"></span><span id="slBank">CHIPS ${money(bank)}</span></div></div>
     <div class="msg" id="slMsg">${msg}</div>
-    <div class="row">${bets.map(v => `<button class="chip c${v}${v === bet ? ' sel' : ''}" data-b="${v}">${v}</button>`).join('')}<button class="btn spin" id="slSpin">SPIN</button></div>
-    <details><summary>Pay table</summary>${moon
-      ? `<p style="margin:6px 0">Each spin plays five lines (the three rows and two V shapes). Pays are per line, as a multiple of a fifth of your bet. 🚀 stands in for anything except 🪐.</p><table class="pay">${['wi', 'di', 'al', 'mo', 'st', 'co'].map(k => `<tr><td>${MS.find(s => s.id === k).g} ×3 / ×4 / ×5</td><td>${MSPAY[k].join(' / ')}</td></tr>`).join('')}<tr><td>🪐 ×3 / ×4 / ×5 anywhere</td><td>2× / 5× / 20× bet + 6 / 8 / 12 free spins</td></tr></table>`
-      : `<table class="pay"><tr><td>7 7 7</td><td>100×</td></tr><tr><td>⭐ ⭐ ⭐</td><td>50×</td></tr><tr><td>BAR BAR BAR</td><td>25×</td></tr><tr><td>🔔 🔔 🔔</td><td>15×</td></tr><tr><td>🍋 🍋 🍋</td><td>10×</td></tr><tr><td>🍒 🍒 🍒</td><td>8×</td></tr><tr><td>Any mix of 7s and ⭐</td><td>10×</td></tr><tr><td>Two 🍒</td><td>2×</td></tr><tr><td>🍒 on the first reel</td><td>1×</td></tr></table>`}</details></div>`;
+    <div class="row">${bets.map(v => `<button class="chip c${v}${v === bet ? ' sel' : ''}" data-b="${v}">${v}</button>`).join('')}<button class="btn spin" id="slSpin">SPIN</button></div></div>
+    <div class="paycard" id="slPay"></div></div></div>`;
+  // the pay table, always on screen, in chips for the bet you have chosen
+  function payTable() {
+    const row = (sym, pays, note = '') => `<tr><td class="sy">${sym}</td><td>${pays}</td>${note ? `<td class="nt">${note}</td>` : ''}</tr>`;
+    if (!moon) {
+      const r = (sym, m) => row(sym, `<b>${money(m * bet)}</b>`, `${m}×`);
+      return `<h3>Pays at a ${bet}-chip bet</h3><p>Match symbols across the red line.</p><table class="pay">${r('<i class="s7">7</i><i class="s7">7</i><i class="s7">7</i>', 100)}${r('⭐⭐⭐', 50)}${r('<i class="bar">BAR</i><i class="bar">BAR</i><i class="bar">BAR</i>', 25)}${r('🔔🔔🔔', 15)}${r('🍋🍋🍋', 10)}${r('🍒🍒🍒', 8)}${r('Any 7s + ⭐ mix', 10)}${r('Any two 🍒', 2)}${r('🍒 on reel 1', 1)}</table>`;
+    }
+    const lb = bet / 5, cell = m => `<b>${money(m * lb)}</b>`;
+    const r = k => { const s2 = MS.find(x => x.id === k).g; return `<tr><td class="sy">${s2}</td>${MSPAY[k].map(m => `<td>${cell(m)}</td>`).join('')}</tr>`; };
+    return `<h3>Pays per line at a ${bet}-chip bet</h3><p>Five lines: the three rows and two Vs. Matches count from the left reel.</p>
+      <table class="pay"><tr class="hd"><td></td><td>×3</td><td>×4</td><td>×5</td></tr>${['wi', 'di', 'al', 'mo', 'st', 'co'].map(r).join('')}
+      <tr><td class="sy">🪐</td><td><b>${money(bet * 2)}</b><br><small>+6 free</small></td><td><b>${money(bet * 5)}</b><br><small>+8 free</small></td><td><b>${money(bet * 20)}</b><br><small>+12 free</small></td></tr></table>
+      <p class="fine">🚀 is wild: it stands in for any symbol except 🪐. 🪐 pays anywhere on the reels and starts free spins.</p>`;
+  }
   const $ = id => el.querySelector('#' + id);
   const fill = (i, col) => { const s = $('st' + i); s.style.transition = 'none'; s.style.transform = 'translateY(0)'; s.innerHTML = col.map(x => cellHtml(x, H)).join(''); };
   last.forEach((c, i) => fill(i, c));
-  const show = () => { $('slBank').textContent = `CHIPS ${money(bank)}`; $('slWin').textContent = `WIN ${money(win)}`; $('slFree').textContent = free ? `FREE SPINS ${free}` : ''; $('slSpin').textContent = free ? `FREE (${free})` : 'SPIN'; $('slMsg').textContent = msg; };
+  const show = () => { $('slPay').innerHTML = payTable(); $('slBank').textContent = `CHIPS ${money(bank)}`; $('slWin').textContent = `WIN ${money(win)}`; $('slFree').textContent = free ? `FREE SPINS ${free}` : ''; $('slSpin').textContent = free ? `FREE (${free})` : 'SPIN'; $('slMsg').textContent = msg; };
   async function spin() {
     if (busy) return;
     const isFree = free > 0;
@@ -182,7 +202,7 @@ export function openSlot(kind, el, live) {
     if (free > 0) { await delay(900); if (live()) spin(); }
   }
   el.onclick = e => {
-    const b = e.target.closest('[data-b]'); if (b && !busy && !free) { bet = +b.dataset.b; el.querySelectorAll('[data-b]').forEach(x => x.classList.toggle('sel', x === b)); return; }
+    const b = e.target.closest('[data-b]'); if (b && !busy && !free) { bet = +b.dataset.b; el.querySelectorAll('[data-b]').forEach(x => x.classList.toggle('sel', x === b)); show(); return; }
     if (e.target.closest('#slSpin')) spin();
   };
   el.onkeydown = null;
