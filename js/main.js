@@ -936,7 +936,8 @@ addEventListener('keydown', e => {
     else if (S.mode === 'world' && e.code === 'Escape') setPaused(true);
     else if (S.mode === 'outside' && e.code === 'KeyE') golf.use();
     else if (S.mode === 'outside' && e.code === 'Escape') setPaused(true);
-  } else if (S.mode === 'outside' && !S.paused && e.code === 'KeyC') golf.summon();
+  } else if (S.mode === 'outside' && !S.paused && e.code === 'KeyB') golf.key('KeyB');
+  else if (S.mode === 'outside' && !S.paused && e.code === 'KeyC') golf.summon();
   else if (S.mode === 'outside' && !S.paused && e.code === 'KeyQ') golf.quit(); else if (e.code === 'Space' && S.mode === 'game') active?.down?.('key');
   else if (e.code === 'Space' && S.mode === 'outside' && !S.paused) golf.down('key');
 });
@@ -967,7 +968,7 @@ function touchUI() {
 }
 if (TOUCH) {
   const el = document.createElement('div'); el.id = 'touch'; el.className = 'hidden';
-  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tMenu" class="tMini">☰ MENU</button><button id="tCall" class="tMini hidden">CART</button><button id="tQuit" class="tMini hidden">QUIT GOLF</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
+  el.innerHTML = `<div id="tJoy"><i id="tKnob"></i></div><button id="tAct">USE</button><button id="tMenu" class="tMini">☰ MENU</button><button id="tCall" class="tMini hidden">CART</button><button id="tQuit" class="tMini hidden">QUIT GOLF</button><button id="tAlt" class="tCart hidden">BOUNCE</button><button id="tTurbo" class="tCart hidden">TURBO</button><button id="tDrift" class="tCart hidden">DRIFT</button><button id="tExit" class="hidden">✕ Exit</button>`;
   document.body.appendChild(el);
   const css = document.createElement('style');
   css.textContent = `
@@ -982,7 +983,7 @@ if (TOUCH) {
     .tCart{position:absolute;right:max(132px,calc(env(safe-area-inset-right) + 106px));width:72px;height:72px;border-radius:50%;pointer-events:auto;background:rgba(16,21,31,.82);color:#fff;border:2px solid rgba(255,255,255,.4);font-weight:800;font-size:11.5px;letter-spacing:.03em;touch-action:none}
     .tMini{position:absolute;left:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 13px;font-weight:700;font-size:12px;letter-spacing:.03em}
     #tCall{top:136px} #tQuit{top:176px} #tMenu{top:216px}
-    .tCart.on{background:rgba(242,180,65,.92);color:#1a1303} #tTurbo{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tDrift{bottom:max(34px,env(safe-area-inset-bottom))}
+    .tCart.on{background:rgba(242,180,65,.92);color:#1a1303} #tTurbo{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tAlt{bottom:max(118px,calc(env(safe-area-inset-bottom) + 78px))} #tDrift{bottom:max(34px,env(safe-area-inset-bottom))}
     #tExit{position:absolute;left:12px;top:12px;pointer-events:auto;background:rgba(16,21,31,.85);color:#fff;border:1px solid rgba(255,255,255,.2);
       border-radius:999px;padding:9px 14px;font-weight:600;font-size:14px}
     .g-wind{top:60px;left:12px;font-size:12px} .g-clubs span{padding:3px 6px;font-size:11px} .g-tip{display:none} .g-bar.golf{width:240px} .g-prompt{top:64%} #panel .hint{display:none} .g-exit{display:none} .g-plaque{display:none} .g-side{top:auto;bottom:150px;right:12px;font-size:11.5px;min-width:150px;padding:8px 10px} .g-side.left{left:12px;right:auto;top:96px;bottom:auto;min-width:0}
@@ -1034,6 +1035,7 @@ if (TOUCH) {
   $('tExit').addEventListener('click', () => { if (S.mode === 'outside') golf.back(); else exitGame(true); });
   $('tMenu').addEventListener('click', () => { if (S.mode === 'world' || S.mode === 'outside') setPaused(true); });
   $('tCall').addEventListener('click', () => { if (S.mode === 'outside') golf.summon(); });
+  $('tAlt').addEventListener('touchstart', e => { e.preventDefault(); if (S.mode === 'outside') golf.alt2(); }, { passive: false });
   $('tQuit').addEventListener('click', () => { if (S.mode === 'outside') golf.quit(); });
   for (const [id, code] of [['tTurbo', 'Space'], ['tDrift', 'ShiftLeft']]) {            // cart buttons: hold to boost or slide
     const b = $(id), set = v => e => { e.preventDefault(); keys[code] = v; b.classList.toggle('on', v); };
@@ -1136,6 +1138,7 @@ function frame(now) {
     $('tExit').classList.toggle('hidden', !(S.mode === 'game' || (S.mode === 'outside' && golf.canBack)));
     const out = S.mode === 'outside' && !S.paused, gs = out ? golf.S.state : '';
     $('tCall').classList.toggle('hidden', !(gs === 'foot' || gs === 'landed')); $('tQuit').classList.toggle('hidden', !(out && golf.S.golf && gs !== 'bar' && gs !== 'pool' && gs !== 'pong' && gs !== 'casino'));
+    { const a = out ? golf.alt : null; $('tAlt').classList.toggle('hidden', !a); if (a && $('tAlt').textContent !== a) $('tAlt').textContent = a; }
     const inCart = S.mode === 'outside' && golf.S.state === 'cart' && !S.paused;
     if (inCart !== cartBtns) { cartBtns = inCart; for (const id of ['tTurbo', 'tDrift']) { $(id).classList.toggle('hidden', !inCart); $(id).classList.remove('on'); } if (!inCart) keys.Space = keys.ShiftLeft = false; }
   }
