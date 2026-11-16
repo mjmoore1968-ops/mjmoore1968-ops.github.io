@@ -7,7 +7,7 @@ const TOP = 0.78, HL = 1.2, HW = 0.38;       // table height, half length, half 
 const CUP_H = 0.115, RIM = 0.045, SINK = 0.033, LIP = 0.052;
 const OX = 0, OZ = 0.75;                     // where your throws leave your hand
 const DMIN = 1.25, DSPAN = 0.85;             // power 0..1 → how far down the table the ball comes down
-const SWEEP = 0.6;                          // seconds for the power bar to run from empty to full
+const SWEEP = 1.0;                          // seconds for the power bar to run from empty to full
 const rackAt = side => {                     // side -1: Pat's cups (your targets). +1: yours.
   const out = []; for (let r = 0; r < 3; r++) for (let i = 0; i < 3 - r; i++) out.push({ x: (i - (2 - r) / 2) * 0.098, z: side * (1.05 - r * 0.085), on: true, mesh: null, gone: 0 });
   return out;
@@ -125,7 +125,7 @@ export function createPong(THREE, host) {
       if (P.cT < 0.06) { P.phase = 'aim'; return; }
       // where it lands: power sets the distance, the arrow sets the direction, and your hand is never perfectly steady
       const d = drinks(), shake = () => (Math.random() + Math.random() - 1);
-      const dist = DMIN + P.tm * DSPAN + shake() * (0.026 + d * 0.006), th = P.ang + P.sx + shake() * (0.009 + d * 0.003);
+      const dist = DMIN + P.tm * DSPAN + shake() * (0.014 + d * 0.006), th = P.ang + P.sx + shake() * (0.0055 + d * 0.003);
       P.lastPow = P.tm;
       launch('you', { x: OX + Math.sin(th) * dist, z: OZ - Math.cos(th) * dist }, P.bounce);
     },
