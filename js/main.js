@@ -28,7 +28,7 @@ try {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 } catch (e) {
   $('hud').classList.add('hidden'); $('lite').classList.remove('hidden');
-  $('liteNote').textContent = 'Your browser could not start the 3D view, so here are the links.';
+  $('liteNote').innerHTML = 'Your browser could not start the 3D view, so here are the links.<br>This usually means 3D graphics (WebGL) are switched off or crashed in your browser. Fully restart the browser, or turn on “Use graphics acceleration when available” in its settings, then <a href="" onclick="location.reload();return false">try again</a>.';
   throw e;
 }
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, TOUCH ? 1.75 : 2));
