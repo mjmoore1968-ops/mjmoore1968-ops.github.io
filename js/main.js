@@ -3,6 +3,7 @@ import { createLacrosse, createRocket, createParkour, makeLacrosseStick, VEHICLE
 import * as LB from './leaderboard.js';
 import { createGolf } from './golf.js';
 import { openSlot } from './casino.js';
+import { createPizzeria, pizzaRecord } from './pizza.js';
 
 const LINKS = {
   email: 'mmoore@college.harvard.edu',
@@ -106,17 +107,18 @@ function woodFloor(w, d, base) {
 }
 const noCast = m => { m.castShadow = false; return m; };
 // skip: 'px' or 'nx' leaves that wall out (the shared wall with the doorway is built by hand)
-function room(cx, cz, w, d, h, floorC, wallC, ceilC, skip) {
+// skip may name several walls ('nx nz'); z walls left out are built by hand too (the kitchen opening)
+function room(cx, cz, w, d, h, floorC, wallC, ceilC, skip = '') {
   noCast(box(scene, w, 0.2, d, floorC, cx, -0.1, cz));
   noCast(box(scene, w, 0.2, d, ceilC, cx, h + 0.1, cz));
-  noCast(box(scene, w, h, 0.2, wallC, cx, h / 2, cz - d / 2 - 0.1)); col(cx, cz - d / 2 - 0.1, w + 1, 0.2);
-  noCast(box(scene, w, h, 0.2, wallC, cx, h / 2, cz + d / 2 + 0.1)); col(cx, cz + d / 2 + 0.1, w + 1, 0.2);
+  if (!skip.includes('nz')) { noCast(box(scene, w, h, 0.2, wallC, cx, h / 2, cz - d / 2 - 0.1)); col(cx, cz - d / 2 - 0.1, w + 1, 0.2); }
+  if (!skip.includes('pz')) { noCast(box(scene, w, h, 0.2, wallC, cx, h / 2, cz + d / 2 + 0.1)); col(cx, cz + d / 2 + 0.1, w + 1, 0.2); }
   for (const [s, key] of [[-1, 'nx'], [1, 'px']]) {
-    if (skip === key) continue;
+    if (skip.includes(key)) continue;
     noCast(box(scene, 0.2, h, d, wallC, cx + s * (w / 2 + 0.1), h / 2, cz)); col(cx + s * (w / 2 + 0.1), cz, 0.2, d + 1);
     noCast(box(scene, 0.03, 0.1, d, 0xf5f1e8, cx + s * (w / 2 - 0.015), 0.05, cz));
   }
-  for (const s of [-1, 1]) noCast(box(scene, w, 0.1, 0.03, 0xf5f1e8, cx, 0.05, cz + s * (d / 2 - 0.015)));
+  for (const [s, key] of [[-1, 'nz'], [1, 'pz']]) if (!skip.includes(key)) noCast(box(scene, w, 0.1, 0.03, 0xf5f1e8, cx, 0.05, cz + s * (d / 2 - 0.015)));
   // crown molding
   for (const s of [-1, 1]) { noCast(box(scene, w, 0.09, 0.07, 0xf8f5ee, cx, h - 0.045, cz + s * (d / 2 - 0.035))); noCast(box(scene, 0.07, 0.09, d, 0xf8f5ee, cx + s * (w / 2 - 0.035), h - 0.045, cz)); }
 }
@@ -296,7 +298,7 @@ const DOOR = { z0: 0.75, z1: 1.85, x: 3.6, open: false, t: 0, group: null, col: 
   seg(x - 0.05, -3, z0, 0, 2.8, 0xcbd3cf); seg(x - 0.05, z1, 3, 0, 2.8, 0xcbd3cf); seg(x - 0.05, z0, z1, DH, 2.8, 0xcbd3cf);
   // living-room face
   seg(x + 0.05, -5, z0, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z1, 5, 0, 3.2, 0xe7e0d3); seg(x + 0.05, z0, z1, DH, 3.2, 0xe7e0d3);
-  col(x, (-6.5 + z0) / 2, 0.2, z0 + 6.5); col(x, (z1 + 6.5) / 2, 0.2, 6.5 - z1);
+  col(x, (-5.2 + z0) / 2, 0.2, z0 + 5.2); col(x, (z1 + 6.5) / 2, 0.2, 6.5 - z1);
   box(scene, 0.22, 0.03, z1 - z0, 0x5d4632, x, 0.0, (z0 + z1) / 2);                       // threshold
   // trim on both faces
   for (const s of [-1, 1]) {
@@ -340,7 +342,20 @@ function tombstone(parent, name, x, y, z, s) {
 (function living() {
   // shell first (13 x 10), then furniture positions are squeezed from the original 16 x 12 layout
   MX = x => x + LIV; MZ = z => z;
-  room(38.5, 0, 13, 10, 3.2, woodFloor(13, 10, '#94704c'), 0xe9e2d5, 0xf5f2ec, 'nx');
+  room(38.5, 0, 13, 10, 3.2, woodFloor(13, 10, '#94704c'), 0xe9e2d5, 0xf5f2ec, 'nx nz');
+  // north wall, with a wide cased opening into the kitchen (room x KX0..KX1)
+  { const KX0 = 34.4, KX1 = 36.0, KH = 2.4, wc = 0xe9e2d5;
+    noCast(box(scene, KX0 - 32, 3.2, 0.2, wc, (32 + KX0) / 2, 1.6, -5.1)); noCast(box(scene, 45 - KX1, 3.2, 0.2, wc, (KX1 + 45) / 2, 1.6, -5.1));
+    noCast(box(scene, KX1 - KX0, 3.2 - KH, 0.2, wc, (KX0 + KX1) / 2, (KH + 3.2) / 2, -5.1));
+    col((31.5 + KX0) / 2, -5.1, KX0 - 31.5, 0.2); col((KX1 + 45.5) / 2, -5.1, 45.5 - KX1, 0.2);
+    noCast(box(scene, KX0 - 32, 0.1, 0.03, 0xf5f1e8, (32 + KX0) / 2, 0.05, -4.985)); noCast(box(scene, 45 - KX1, 0.1, 0.03, 0xf5f1e8, (KX1 + 45) / 2, 0.05, -4.985));
+    box(scene, KX1 - KX0, 0.02, 0.24, 0x5d4632, (KX0 + KX1) / 2, 0.0, -5.1);                         // threshold
+    for (const z of [-4.985, -5.215]) {                                                                // casing on both faces
+      box(scene, 0.09, KH + 0.08, 0.03, 0xf5f1e8, KX0 - 0.045, (KH + 0.08) / 2, z); box(scene, 0.09, KH + 0.08, 0.03, 0xf5f1e8, KX1 + 0.045, (KH + 0.08) / 2, z);
+      box(scene, KX1 - KX0 + 0.18, 0.09, 0.03, 0xf5f1e8, (KX0 + KX1) / 2, KH + 0.045, z);
+    }
+    plane(scene, 0.8, 0.2, sign('KITCHEN', 0.8, 0.2, '#f5f1e8', '#3a3024', 'Georgia, serif', false), (KX0 + KX1) / 2, KH + 0.3, -4.965, 0);
+    plane(scene, 0.9, 0.2, sign('LIVING ROOM', 0.9, 0.2, '#f6efe0', '#3a3024', 'Georgia, serif', false), (KX0 + KX1) / 2, KH + 0.3, -5.235, Math.PI); }
   box(scene, 0.03, 0.1, 5.75, 0xf5f1e8, 32.015, 0.05, -2.125); box(scene, 0.03, 0.1, 3.15, 0xf5f1e8, 32.015, 0.05, 3.425);
   noCast(box(scene, 0.02, 3.01, 10, 0x24344d, 44.98, 1.605, 0));            // accent wall behind the TV
   MX = x => (x >= 44 ? x - 3 : 32 + (x - 32) * 0.75) + LIV; MZ = z => (Math.abs(z) > 4 ? z - Math.sign(z) : z * 0.75);
@@ -399,8 +414,8 @@ function tombstone(parent, name, x, y, z, s) {
     c.font = `bold ${big}px ${font}`; c.fillText('STORY', x0, H / 2 + 6);
     c.font = `bold ${small}px ${font}`; c.fillText('ST', x0 + wa + gap, H / 2 - big * 0.14);
   });
-  box(scene, 1.84, 0.45, 0.03, 0xdfe5e0, 36.4, 2.2, -5.975);
-  plane(scene, 1.8, 0.42, st, 36.4, 2.2, -5.955, 0);
+  box(scene, 1.84, 0.45, 0.03, 0xdfe5e0, 45.2, 2.62, -5.975);                     // above the bookshelf (the kitchen opening took its old spot)
+  plane(scene, 1.8, 0.42, st, 45.2, 2.62, -5.955, 0);
 
   /* --- mailbox --- */
   const mb = group(37.2, 0, 5.62); mb.rotation.y = Math.PI;
@@ -589,12 +604,170 @@ function tombstone(parent, name, x, y, z, s) {
   for (let i = 0; i < 9; i++) { const a = i * 2.4, r = 0.16 + (i % 3) * 0.1, lf = sph(scene, 0.17, i % 2 ? 0x2f7d4f : 0x3c9460, 32.5 + Math.cos(a) * r, 1.25 + i * 0.075, 2.75 + Math.sin(a) * r); lf.scale.set(1, 0.45, 1.3); lf.rotation.y = a; }
   // window dressing, a wall clock, and more art
   curtains(39.125, 1.75, -4.98, 0, 2.6, 1.5);
-  noCast(cyl(scene, 0.24, 0.24, 0.03, 0x2c2018, 33.95, 2.3, -4.975, 32)).rotation.x = Math.PI / 2;
-  plane(scene, 0.42, 0.42, tex(128, 128, (c, W) => { c.fillStyle = '#f6f1e6'; c.beginPath(); c.arc(64, 64, 62, 0, 7); c.fill(); c.strokeStyle = '#22252b'; c.lineCap = 'round'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.lineWidth = i % 3 ? 2 : 5; c.beginPath(); c.moveTo(64 + Math.sin(a) * 50, 64 - Math.cos(a) * 50); c.lineTo(64 + Math.sin(a) * 57, 64 - Math.cos(a) * 57); c.stroke(); } c.lineWidth = 5; c.beginPath(); c.moveTo(64, 64); c.lineTo(42, 44); c.stroke(); c.lineWidth = 3; c.beginPath(); c.moveTo(64, 64); c.lineTo(92, 34); c.stroke(); c.fillStyle = '#9b1c2c'; c.beginPath(); c.arc(64, 64, 5, 0, 7); c.fill(); }), 33.95, 2.3, -4.957, 0, false);
+  noCast(cyl(scene, 0.24, 0.24, 0.03, 0x2c2018, 33.45, 2.3, -4.975, 32)).rotation.x = Math.PI / 2;
+  plane(scene, 0.42, 0.42, tex(128, 128, (c, W) => { c.fillStyle = '#f6f1e6'; c.beginPath(); c.arc(64, 64, 62, 0, 7); c.fill(); c.strokeStyle = '#22252b'; c.lineCap = 'round'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.lineWidth = i % 3 ? 2 : 5; c.beginPath(); c.moveTo(64 + Math.sin(a) * 50, 64 - Math.cos(a) * 50); c.lineTo(64 + Math.sin(a) * 57, 64 - Math.cos(a) * 57); c.stroke(); } c.lineWidth = 5; c.beginPath(); c.moveTo(64, 64); c.lineTo(42, 44); c.stroke(); c.lineWidth = 3; c.beginPath(); c.moveTo(64, 64); c.lineTo(92, 34); c.stroke(); c.fillStyle = '#9b1c2c'; c.beginPath(); c.arc(64, 64, 5, 0, 7); c.fill(); }), 33.45, 2.3, -4.957, 0, false);
   frameArt(scene, 37.35, 2.15, 4.975, Math.PI, 0.5, 0.4, 4); frameArt(scene, 37.35, 1.62, 4.975, Math.PI, 0.5, 0.4, 7); frameArt(scene, 35.9, 2.1, 4.975, Math.PI, 0.62, 0.46, 5, 0xd9b34a);
   frameArt(scene, 32.025, 2.0, -3.3, Math.PI / 2, 0.5, 0.66, 8, 0xd9b34a);
 
   MX = x => x; MZ = z => z;
+})();
+
+/* ------------------------------------------------------------------ kitchen (x 0.6..9.4, z -11.2..-5.2), through the opening in the living room's north wall */
+const KIT = { fire: null, flames: [], board: null, boardTex: null, spot: { x: 6.6, z: -6.3 } };
+function drawKitchenBoard(rec = pizzaRecord()) {
+  if (!KIT.board) return;
+  const c = KIT.board.getContext('2d'), W = KIT.board.width, H = KIT.board.height;
+  c.fillStyle = '#26302b'; c.fillRect(0, 0, W, H);
+  c.fillStyle = 'rgba(255,255,255,.05)'; for (let i = 0; i < 90; i++) c.fillRect((i * 7919) % W, (i * 104729) % H, 40, 3);   // old chalk smudges
+  c.fillStyle = '#f4efe6'; c.textAlign = 'center';
+  c.font = 'bold 64px Georgia, serif'; c.fillText('MOORE’S PIZZERIA', W / 2, 92);
+  c.strokeStyle = 'rgba(244,239,230,.7)'; c.lineWidth = 4; c.beginPath(); c.moveTo(W * 0.2, 118); c.lineTo(W * 0.8, 118); c.stroke();
+  c.font = '600 40px "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif';
+  c.fillStyle = '#ffd27a'; c.fillText(`Next shift: day ${rec.day}`, W / 2, 190);
+  c.fillStyle = '#f4efe6'; c.fillText(rec.best ? `Best shift: ${rec.best} pts` : 'Best shift: ---', W / 2, 258);
+  c.fillText(`Pies served: ${rec.served}`, W / 2, 322);
+  c.fillStyle = '#9fd9b1'; c.font = '600 34px "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif'; c.fillText('Fire up the oven to play →', W / 2, 400);
+  if (KIT.boardTex) KIT.boardTex.needsUpdate = true;
+}
+(function kitchen() {
+  const cx = 5.0, cz = -8.2, w = 8.8, d = 6.0, h = 3.2, wallC = 0xf1e6d2;
+  const floor = tex(512, 512, (c, W) => { const n = 8, s = W / n; for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { c.fillStyle = (i + j) % 2 ? '#2f2b28' : '#efe8da'; c.fillRect(i * s, j * s, s, s); }
+    c.strokeStyle = 'rgba(0,0,0,.16)'; c.lineWidth = 2; for (let i = 0; i <= n; i++) { c.beginPath(); c.moveTo(i * s, 0); c.lineTo(i * s, W); c.moveTo(0, i * s); c.lineTo(W, i * s); c.stroke(); } });
+  floor.wrapS = floor.wrapT = THREE.RepeatWrapping; floor.repeat.set(w / 3.2, d / 3.2);
+  room(cx, cz, w, d, h, new THREE.MeshLambertMaterial({ map: floor }), wallC, 0xf7f4ee, 'pz');
+  // south wall: the living room's wall covers x >= 3.7; close the rest, and give the whole kitchen side a kitchen-coloured skin
+  noCast(box(scene, 3.3, h, 0.2, wallC, 2.05, h / 2, -5.1)); col(2.05, -5.1, 3.5, 0.2);
+  noCast(box(scene, 2.4, h, 0.01, wallC, 4.9, h / 2, -5.207)); noCast(box(scene, 1.7, h, 0.01, wallC, 8.55, h / 2, -5.207)); noCast(box(scene, 1.6, h - 2.4, 0.01, wallC, 6.9, 2.8, -5.207));
+  noCast(box(scene, 5.5, 0.1, 0.03, 0xf5f1e8, 3.35, 0.05, -5.225)); noCast(box(scene, 1.7, 0.1, 0.03, 0xf5f1e8, 8.55, 0.05, -5.225));
+  noCast(box(scene, 8.8, 0.09, 0.07, 0xf8f5ee, cx, h - 0.045, -5.235));
+  lamp(5.0, 2.7, -8.2, 8);
+  const navy = 0x24344d, navy2 = 0x2c3e5a, brass = 0xd9b34a, steel = 0xb9bcc4, top = 0xe9e6df;
+  const subway = (wd, ht) => { const t = tex(512, 256, (c, W, H) => { c.fillStyle = '#d9d4ca'; c.fillRect(0, 0, W, H); for (let r = 0; r < 8; r++) for (let i = -1; i < 9; i++) { const x = i * 64 + (r % 2) * 32; const g = c.createLinearGradient(0, r * 32, 0, r * 32 + 30); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#ece8e0'); c.fillStyle = g; c.fillRect(x + 2, r * 32 + 2, 60, 28); } });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(wd / 1.2, ht / 0.6); return t; };
+  // fridge in the north-west corner
+  { const f = group(1.1, 0, -10.8);
+    box(f, 0.9, 2.0, 0.8, 0xc9ccd2, 0, 1.0, 0); box(f, 0.88, 1.25, 0.02, 0xd5d8de, 0, 1.36, 0.405); box(f, 0.88, 0.66, 0.02, 0xd5d8de, 0, 0.36, 0.405);
+    box(f, 0.03, 0.5, 0.04, 0x8f949c, 0.36, 1.3, 0.44); box(f, 0.45, 0.03, 0.04, 0x8f949c, 0, 0.6, 0.44); box(f, 0.9, 0.02, 0.02, 0x7a7f87, 0, 0.71, 0.41);
+    [0xd64545, 0x2a9d8f, 0xe9c46a].forEach((c, i) => box(f, 0.05, 0.05, 0.02, c, -0.25 + i * 0.12, 1.75 - (i % 2) * 0.08, 0.42));
+    plane(f, 0.22, 0.3, tex(128, 176, (c, W, H) => { c.fillStyle = '#fffaf0'; c.fillRect(0, 0, W, H); c.fillStyle = '#b8262d'; c.fillRect(0, 0, W, 40); c.fillStyle = '#fff'; c.font = 'bold 26px Georgia, serif'; c.textAlign = 'center'; c.fillText('PIZZA', W / 2, 30); c.fillStyle = '#555'; for (let i = 0; i < 8; i++) c.fillRect(14, 56 + i * 14, 70 + (i * 13) % 30, 5); }), -0.12, 1.45, 0.417, 0, false);
+    col(1.1, -10.8, 0.9, 0.8); }
+  // counter run along the north wall, broken by the range
+  const zc = -10.9;
+  for (const [x0, x1] of [[1.6, 5.02], [5.78, 6.9]]) {
+    const wd = x1 - x0, xm = (x0 + x1) / 2;
+    box(scene, wd, 0.8, 0.58, navy, xm, 0.48, zc - 0.01); box(scene, wd, 0.08, 0.52, 0x1a2333, xm, 0.04, zc - 0.03);
+    box(scene, wd + 0.02, 0.05, 0.66, top, xm, 0.905, zc + 0.03);
+    const n = Math.max(1, Math.round(wd / 0.6)), dw = wd / n;
+    for (let i = 0; i < n; i++) { const dx = x0 + dw * (i + 0.5); noCast(box(scene, dw - 0.05, 0.68, 0.02, navy2, dx, 0.48, zc + 0.29)); box(scene, 0.14, 0.02, 0.03, brass, dx, 0.77, zc + 0.31); }
+    col(xm, zc, wd, 0.62);
+  }
+  plane(scene, 3.42, 0.6, subway(3.42, 0.6), 3.31, 1.23, -11.195, 0, false); plane(scene, 1.12, 0.6, subway(1.12, 0.6), 6.34, 1.23, -11.195, 0, false);
+  plane(scene, 0.76, 1.1, subway(0.76, 1.1), 5.4, 1.48, -11.195, 0, false);
+  // sink + window
+  box(scene, 0.72, 0.012, 0.44, 0x9aa0a8, 3.0, 0.935, -10.88); box(scene, 0.62, 0.014, 0.34, 0x5f646c, 3.0, 0.937, -10.88);
+  cyl(scene, 0.022, 0.022, 0.3, steel, 3.0, 1.08, -11.1, 10); { const sp = cyl(scene, 0.018, 0.018, 0.22, steel, 3.0, 1.22, -11.0, 10); sp.rotation.x = Math.PI / 2; }
+  for (const s of [-1, 1]) cyl(scene, 0.02, 0.02, 0.06, steel, 3.0 + s * 0.13, 0.97, -11.08, 8);
+  windowPane(3.0, 1.95, -11.18, 0, 1.2, 0.85);
+  cyl(scene, 0.06, 0.05, 0.1, 0xb5653a, 2.7, 1.55, -11.08, 10); sph(scene, 0.08, 0x3c9460, 2.7, 1.66, -11.08);
+  // range, a pot of sauce on the back burner, and the hood
+  { const r = group(5.4, 0, zc);
+    box(r, 0.76, 0.88, 0.62, steel, 0, 0.44, 0); box(r, 0.56, 0.32, 0.02, 0x15171c, 0, 0.42, 0.315); box(r, 0.5, 0.025, 0.04, 0xd5d8de, 0, 0.66, 0.34);
+    for (let i = 0; i < 5; i++) cyl(r, 0.025, 0.025, 0.03, 0x2c2f36, -0.26 + i * 0.13, 0.8, 0.32, 12).rotation.x = Math.PI / 2;
+    box(r, 0.76, 0.03, 0.62, 0x15171c, 0, 0.895, 0);
+    for (const [bx, bz] of [[-0.18, -0.15], [0.18, -0.15], [-0.18, 0.15], [0.18, 0.15]]) noCast(cyl(r, 0.1, 0.1, 0.012, 0x3a3e46, bx, 0.915, bz, 20));
+    cyl(r, 0.13, 0.12, 0.16, 0x9aa0a8, -0.18, 0.995, -0.15, 20); cyl(r, 0.115, 0.115, 0.01, 0xb8321f, -0.18, 1.07, -0.15, 20); box(r, 0.2, 0.02, 0.03, 0x2c2f36, -0.18, 1.06, 0.02);
+    box(r, 0.86, 0.3, 0.52, 0xa9adb5, 0, 2.05, -0.06); box(r, 0.3, 1.0, 0.3, 0xa9adb5, 0, 2.7, -0.15); noCast(box(r, 0.6, 0.01, 0.3, 0xfff3d6, 0, 1.895, 0, { emissive: 0xffe6b0, emissiveIntensity: 0.7 }));
+    col(5.4, zc, 0.78, 0.64); }
+  // upper cabinets with lights tucked underneath
+  for (const [x0, x1] of [[1.6, 2.35], [3.65, 4.95], [5.85, 6.9]]) {
+    const wd = x1 - x0, xm = (x0 + x1) / 2;
+    box(scene, wd, 0.8, 0.34, navy, xm, 2.05, -11.03);
+    const n = Math.max(1, Math.round(wd / 0.5)), dw = wd / n;
+    for (let i = 0; i < n; i++) { const dx = x0 + dw * (i + 0.5); noCast(box(scene, dw - 0.04, 0.72, 0.02, navy2, dx, 2.05, -10.855)); box(scene, 0.02, 0.12, 0.03, brass, dx + (i % 2 ? -1 : 1) * (dw / 2 - 0.07), 1.78, -10.84); }
+    noCast(box(scene, wd - 0.06, 0.012, 0.04, 0xfff3d6, xm, 1.644, -10.92, { emissive: 0xffe6b0, emissiveIntensity: 0.9 }));
+  }
+  // things on the counter: cutting board with tomatoes, canisters, a knife block, a utensil crock
+  box(scene, 0.42, 0.025, 0.28, 0x9b6b3f, 2.05, 0.94, -10.85); for (let i = 0; i < 3; i++) sph(scene, 0.042, 0xd23a2a, 1.95 + i * 0.09, 0.99, -10.85 + (i % 2) * 0.05);
+  ['FLOUR', 'SUGAR', 'SALT'].forEach((t, i) => { const r = 0.075 - i * 0.012, hh = 0.24 - i * 0.04; cyl(scene, r, r, hh, 0xf4f1ea, 6.05 + i * 0.2, 0.93 + hh / 2, -11.0, 18); cyl(scene, r + 0.005, r + 0.005, 0.03, 0x6b4a2f, 6.05 + i * 0.2, 0.945 + hh, -11.0, 18); });
+  { const kb = box(scene, 0.12, 0.22, 0.16, 0x6b4a2f, 6.65, 1.04, -10.98); kb.rotation.x = -0.2; for (let i = 0; i < 4; i++) box(scene, 0.025, 0.09, 0.03, 0x15171c, 6.62 + (i % 2) * 0.05, 1.19, -11.02 + Math.floor(i / 2) * 0.05); }
+  cyl(scene, 0.06, 0.055, 0.15, 0xe9dccb, 4.8, 1.0, -11.0, 14); for (let i = 0; i < 3; i++) { const u = cyl(scene, 0.008, 0.008, 0.28, i ? 0x8a5a33 : 0x2c2f36, 4.79 + i * 0.02, 1.13, -11.0 + (i - 1) * 0.02, 6); u.rotation.z = (i - 1) * 0.15; }
+  // island with a pie in progress, a rolling pin, flour and a stack of pizza boxes
+  { const ix = 4.4, iz = -8.0;
+    box(scene, 2.3, 0.86, 0.78, navy, ix, 0.43, iz - 0.1); box(scene, 2.44, 0.06, 1.04, 0x8a5a33, ix, 0.89, iz);
+    for (let i = 0; i < 4; i++) noCast(box(scene, 0.52, 0.66, 0.02, navy2, ix - 0.84 + i * 0.56, 0.46, iz - 0.5));
+    col(ix, iz, 2.44, 1.04);
+    box(scene, 0.62, 0.025, 0.62, 0xc49a62, ix - 0.25, 0.935, iz); cyl(scene, 0.25, 0.25, 0.022, 0xecd3a0, ix - 0.25, 0.958, iz, 32); cyl(scene, 0.215, 0.215, 0.012, 0xb8321f, ix - 0.25, 0.972, iz, 32); cyl(scene, 0.2, 0.2, 0.008, 0xf5d77a, ix - 0.25, 0.98, iz, 32);
+    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2, r = i ? 0.12 : 0; cyl(scene, 0.035, 0.035, 0.008, 0xa52a20, ix - 0.25 + Math.cos(a) * r * (i ? 1 : 0), 0.987, iz + Math.sin(a) * r, 14); }
+    { const rp = cyl(scene, 0.035, 0.035, 0.42, 0xd9b98a, ix + 0.35, 0.96, iz + 0.15, 14); rp.rotation.z = Math.PI / 2; rp.rotation.y = 0.4; for (const s of [-1, 1]) { const hnd = cyl(scene, 0.016, 0.016, 0.1, 0x8a5a33, ix + 0.35 + Math.cos(0.4) * s * 0.26, 0.96, iz + 0.15 - Math.sin(0.4) * s * 0.26, 8); hnd.rotation.z = Math.PI / 2; hnd.rotation.y = 0.4; } }
+    noCast(box(scene, 0.5, 0.003, 0.4, 0xfbfaf6, ix + 0.3, 0.922, iz - 0.15));
+    { const fb = box(scene, 0.22, 0.3, 0.14, 0xf4efe2, ix + 0.78, 1.07, iz - 0.28); fb.rotation.y = 0.3; }
+    const logo = tex(256, 256, (c, W) => { c.fillStyle = '#c9a877'; c.fillRect(0, 0, W, W); c.strokeStyle = '#b8262d'; c.lineWidth = 10; c.beginPath(); c.arc(W / 2, W / 2, 86, 0, 7); c.stroke(); c.fillStyle = '#b8262d'; c.font = 'bold 40px Georgia, serif'; c.textAlign = 'center'; c.fillText('MOORE’S', W / 2, W / 2 - 4); c.font = 'bold 26px Georgia, serif'; c.fillText('PIZZERIA', W / 2, W / 2 + 32); });
+    for (let i = 0; i < 3; i++) { const b2 = box(scene, 0.42, 0.06, 0.42, 0xc9a877, ix + 0.85, 0.95 + i * 0.062, iz + 0.12); b2.rotation.y = i * 0.05; }
+    plane(scene, 0.4, 0.4, logo, ix + 0.85, 1.105, iz + 0.12, 0, false).rotation.set(-Math.PI / 2, 0, 0.1);
+    for (const sx of [-0.8, 0, 0.8]) {                                                         // stools on the overhang side
+      const g = group(ix + sx, 0, iz + 0.85); cyl(g, 0.19, 0.19, 0.05, 0x8a5a33, 0, 0.68, 0, 20);
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.785, lg = cyl(g, 0.014, 0.014, 0.68, 0x222222, Math.cos(a) * 0.13, 0.33, Math.sin(a) * 0.13, 6); lg.rotation.set(Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12); }
+      cyl(g, 0.15, 0.15, 0.02, 0x222222, 0, 0.25, 0, 16);
+      col(ix + sx, iz + 0.85, 0.4, 0.4);
+    }
+    for (const px of [ix - 0.6, ix + 0.6]) { cyl(scene, 0.006, 0.006, 0.8, 0x222222, px, 2.8, iz, 6); noCast(cyl(scene, 0.06, 0.2, 0.22, 0x1f2a24, px, 2.32, iz, 20)); noCast(sph(scene, 0.06, 0xfff0cc, px, 2.2, iz, { emissive: 0xffe0a0, emissiveIntensity: 1 })); }
+  }
+  // the wood-fired pizza oven on the east wall: this is the game
+  { const ox = 8.75, oz = -8.4, o = group(ox, 0, oz);
+    const stone = tex(256, 256, (c, W) => { c.fillStyle = '#6e6a64'; c.fillRect(0, 0, W, W); const r = (() => { let a = 7; return () => (a = (a * 16807) % 2147483647) / 2147483647; })(); for (let y = 0; y < W; y += 42) for (let x = -40; x < W; x += 64) { const v = 112 + r() * 44; c.fillStyle = `rgb(${v + 8},${v + 2},${v - 6})`; c.fillRect(x + (y / 42 % 2) * 32 + 3, y + 3, 58, 36); } });
+    const brick = tex(256, 256, (c, W) => { c.fillStyle = '#5a2a1c'; c.fillRect(0, 0, W, W); const r = (() => { let a = 3; return () => (a = (a * 16807) % 2147483647) / 2147483647; })(); for (let y = 0; y < W; y += 24) for (let x = -40; x < W; x += 48) { c.fillStyle = `rgb(${150 + r() * 40},${62 + r() * 22},${40 + r() * 16})`; c.fillRect(x + (y / 24 % 2) * 24 + 2, y + 2, 44, 20); } });
+    brick.wrapS = brick.wrapT = THREE.RepeatWrapping; brick.repeat.set(4, 2);
+    box(o, 1.35, 0.86, 1.9, new THREE.MeshLambertMaterial({ map: stone }), 0, 0.43, 0); box(o, 1.46, 0.08, 2.0, 0x6e6a64, -0.03, 0.9, 0);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.85, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ map: brick })); dome.scale.set(0.8, 0.85, 1.05); dome.position.set(0.05, 0.94, 0); dome.castShadow = true; o.add(dome);
+    const face = tex(512, 384, (c, W, H) => {
+      c.fillStyle = '#7a3524'; c.fillRect(0, 0, W, H);
+      for (let y = 0; y < H; y += 32) for (let x = -64; x < W; x += 64) { c.fillStyle = (x / 64 + y / 32) % 3 ? '#9a4a32' : '#8a4029'; c.fillRect(x + (y / 32 % 2) * 32 + 3, y + 3, 58, 26); }
+      c.fillStyle = '#d9cfc0'; c.beginPath(); c.moveTo(96, H); c.lineTo(96, 210); c.arc(W / 2, 210, 160, Math.PI, 0); c.lineTo(416, H); c.fill();     // stone arch
+      const g = c.createRadialGradient(W / 2, H - 40, 10, W / 2, 230, 200); g.addColorStop(0, '#ffcf6e'); g.addColorStop(0.35, '#ff7a1a'); g.addColorStop(0.7, '#4a1408'); g.addColorStop(1, '#120604');
+      c.fillStyle = g; c.beginPath(); c.moveTo(126, H); c.lineTo(126, 214); c.arc(W / 2, 214, 130, Math.PI, 0); c.lineTo(386, H); c.fill();
+      c.fillStyle = '#ffb347'; for (let i = 0; i < 14; i++) { c.beginPath(); c.arc(150 + i * 16, H - 20 - (i % 3) * 6, 8, 0, 7); c.fill(); }
+    });
+    plane(o, 1.3, 0.98, face, -0.6, 1.4, 0, -Math.PI / 2, true);
+    box(o, 0.2, 0.05, 0.9, 0x6e6a64, -0.72, 0.955, 0);                                               // landing ledge
+    const flameTex = tex(128, 256, (c, W, H) => { const g = c.createLinearGradient(0, H, 0, 0); g.addColorStop(0, 'rgba(255,230,140,1)'); g.addColorStop(0.45, 'rgba(255,130,30,.9)'); g.addColorStop(1, 'rgba(255,60,0,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(W * 0.15, H); c.bezierCurveTo(0, H * 0.5, W * 0.5, H * 0.35, W * 0.5, 0); c.bezierCurveTo(W * 0.5, H * 0.35, W, H * 0.5, W * 0.85, H); c.fill(); });
+    for (let i = 0; i < 4; i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.34), new THREE.MeshBasicMaterial({ map: flameTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      m.position.set(-0.615, 1.12, -0.24 + i * 0.16); m.rotation.y = -Math.PI / 2; o.add(m); KIT.flames.push(m);
+    }
+    cyl(o, 0.12, 0.13, 1.75, 0x3a3a3a, 0.42, 2.35, -0.78, 16);                                          // flue to the ceiling, tucked in the back corner
+    // a peel leaning on the south side and logs in the corner
+    { const pl = group(9.2, 0, -7.12); pl.rotation.z = -0.13;                                  // a peel leaning on the wall, blade down
+      box(pl, 0.012, 0.42, 0.38, 0xc49a62, 0, 0.23, 0); box(pl, 0.014, 0.08, 0.2, 0xc49a62, 0, 0.47, 0); cyl(pl, 0.018, 0.018, 0.95, 0x8a5a33, 0, 0.98, 0, 8); }
+    for (let r2 = 0; r2 < 3; r2++) for (let i = 0; i < 3 - r2; i++) { const lg = cyl(scene, 0.09, 0.09, 0.7, i % 2 ? 0x6b4a2f : 0x7d5a3c, 8.95, 0.09 + r2 * 0.16, -10.75 + i * 0.19 + r2 * 0.095, 10); lg.rotation.z = Math.PI / 2; }
+    col(8.95, -10.65, 0.75, 0.62);
+    const sn = tex(1024, 240, (c, W, H) => { c.fillStyle = '#1a0f08'; c.fillRect(0, 0, W, H); c.strokeStyle = '#ff9a3a'; c.lineWidth = 8; c.strokeRect(12, 12, W - 24, H - 24); c.shadowColor = '#ff8a2a'; c.shadowBlur = 26; c.fillStyle = '#ffd27a'; c.textAlign = 'center'; c.textBaseline = 'middle'; fitText(c, 'MOORE’S PIZZERIA', W * 0.86, 120, 'Georgia, serif'); c.fillText('MOORE’S PIZZERIA', W / 2, H / 2 + 6); });
+    plane(scene, 1.5, 0.36, sn, 9.385, 2.45, oz + 0.12, -Math.PI / 2);
+    KIT.fire = new THREE.PointLight(0xff8a3a, 4, 6, 1.6); KIT.fire.position.set(7.75, 1.2, oz); scene.add(KIT.fire);
+    col(ox - 0.03, oz, 1.46, 2.0);
+    interact(o, 'Play Moore’s Pizzeria (fire up the oven)', startPizza);
+  }
+  // pantry shelf by the door
+  { const sx = 9.18, sz = -6.2, g = group(sx, 0, sz);
+    for (const s of [-1, 1]) box(g, 0.4, 2.0, 0.04, 0x6b4a2f, 0, 1.0, s * 0.62);
+    for (let i = 0; i < 4; i++) box(g, 0.4, 0.03, 1.24, 0x7d5a3c, 0, 0.3 + i * 0.5, 0);
+    for (let i = 0; i < 3; i++) { const sk = box(g, 0.3, 0.36, 0.24, 0xf4efe2, -0.02, 0.5, -0.38 + i * 0.36); sk.rotation.y = (i - 1) * 0.15; }
+    for (let i = 0; i < 6; i++) { cyl(g, 0.05, 0.05, 0.13, 0xc23a22, -0.06 + (i % 2) * 0.12, 0.88, -0.45 + Math.floor(i / 2) * 0.12, 12); cyl(g, 0.051, 0.051, 0.06, 0xf6efe0, -0.06 + (i % 2) * 0.12, 0.88, -0.45 + Math.floor(i / 2) * 0.12, 12); }
+    for (let i = 0; i < 3; i++) { cyl(g, 0.035, 0.04, 0.24, 0x5f6e2a, 0, 0.92, 0.22 + i * 0.12, 10); cyl(g, 0.012, 0.012, 0.06, brass, 0, 1.07, 0.22 + i * 0.12, 6); }
+    for (let i = 0; i < 5; i++) { cyl(g, 0.055, 0.055, 0.16, 0xe9e4d8, 0, 1.39, -0.48 + i * 0.24, 12); cyl(g, 0.05, 0.05, 0.1, [0x2f7d4f, 0xe9c46a, 0xd64545, 0x5a3212, 0xf4a261][i], 0, 1.37, -0.48 + i * 0.24, 12); }
+    for (let i = 0; i < 4; i++) box(g, 0.24, 0.2, 0.05, [0x264653, 0xe76f51, 0x2a9d8f, 0x9b1c2c][i], 0, 1.92, -0.3 + i * 0.16);
+    col(sx, sz, 0.45, 1.3); }
+  // chalkboard + a pizza clock on the west wall, a plant in the corner
+  KIT.board = document.createElement('canvas'); KIT.board.width = 768; KIT.board.height = 448;
+  KIT.boardTex = new THREE.CanvasTexture(KIT.board); KIT.boardTex.colorSpace = THREE.SRGBColorSpace; KIT.boardTex.anisotropy = 4;
+  drawKitchenBoard();
+  noCast(box(scene, 0.04, 1.06, 1.78, 0x6b4a2f, 0.62, 1.6, -8.2)); plane(scene, 1.68, 0.98, KIT.boardTex, 0.645, 1.6, -8.2, Math.PI / 2);
+  plane(scene, 0.5, 0.5, tex(256, 256, (c, W) => {
+    c.fillStyle = '#d9a35a'; c.beginPath(); c.arc(128, 128, 126, 0, 7); c.fill(); c.fillStyle = '#c23a22'; c.beginPath(); c.arc(128, 128, 104, 0, 7); c.fill(); c.fillStyle = '#f5d77a'; c.beginPath(); c.arc(128, 128, 98, 0, 7); c.fill();
+    c.fillStyle = '#a52a20'; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; c.beginPath(); c.arc(128 + Math.sin(a) * 78, 128 - Math.cos(a) * 78, 12, 0, 7); c.fill(); }
+    c.strokeStyle = '#2a1d12'; c.lineCap = 'round'; c.lineWidth = 9; c.beginPath(); c.moveTo(128, 128); c.lineTo(128 - 34, 128 - 30); c.stroke(); c.lineWidth = 6; c.beginPath(); c.moveTo(128, 128); c.lineTo(128 + 52, 128 - 40); c.stroke();
+  }), 0.62, 2.62, -8.2, Math.PI / 2, false);
+  plant(1.05, -5.75);
+  frameArt(scene, 0.62, 1.75, -10.0, Math.PI / 2, 0.5, 0.62, 2, 0xd9b34a);
 })();
 
 /* ------------------------------------------------------------------ state */
@@ -638,13 +811,13 @@ $('quitGolfBtn').addEventListener('click', e => { e.stopPropagation(); setPaused
 // The pause menu doubles as a map: jump straight home, to the first tee, into Lucky's or into the casino.
 function travel(dest) {
   setPaused(false);
-  if (dest === 'home') { if (S.mode === 'outside') goInside(); else { S.pos.set(13.3, 1.62, 3.0); S.yaw = 0; S.pitch = 0; } }
+  if (dest === 'home' || dest === 'kitchen') { const k = dest === 'kitchen'; if (S.mode === 'outside') goInside(k); else placeIndoors(k); }
   else if (S.mode === 'outside') { golf.goto(dest); lastHud = ''; }
   else goOutside(() => golf.goto(dest));
   lock();
 }
 for (const b of document.querySelectorAll('#pause [data-go]')) b.addEventListener('click', e => { e.stopPropagation(); travel(b.dataset.go); });
-const WORLD_HELP = { title: 'The apartment', items: ['Walk with WASD or the arrow keys and look with the mouse.', 'Press E or click on anything that shows a prompt. E, Esc or “Back to world” closes whatever you opened.', 'The TV and console in the living room launch the three arcade games.', 'The bar cart pours beers. They wear off slowly, but too many and you wake up back in bed.', 'The red front door leads outside to Story St.: your golf cart, the golf club, Lucky’s and the casino.'] };
+const WORLD_HELP = { title: 'The apartment', items: ['Walk with WASD or the arrow keys and look with the mouse.', 'Press E or click on anything that shows a prompt. E, Esc or “Back to world” closes whatever you opened.', 'The TV and console in the living room launch the three arcade games.', 'The bar cart pours beers. They wear off slowly, but too many and you wake up back in bed.', 'The opening next to Pat’s armchair leads to the kitchen. Fire up the wood-fired oven to run Moore’s Pizzeria: take orders, build, bake, cut and serve.', 'The red front door leads outside to Story St.: your golf cart, the golf club, Lucky’s and the casino.'] };
 $('howBtn').addEventListener('click', e => {
   e.stopPropagation(); const box = $('howBox');
   if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
@@ -780,8 +953,13 @@ function goOutside(after) {
     golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter(); if (typeof after === 'function') after();
   });
 }
-function goInside() {
-  fadeThrough(() => { golf?.leave(); S.mode = 'world'; S.pos.set(13.3, 1.62, 3.9); S.yaw = 0; S.pitch = 0; lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); wobbleFilter(); });
+function placeIndoors(kitchen) {
+  if (kitchen) { S.pos.set(KIT.spot.x, 1.62, KIT.spot.z); S.yaw = Math.atan2(-(7.9 - KIT.spot.x), -(-8.4 - KIT.spot.z)); }      // facing the pizza oven
+  else { S.pos.set(13.3, 1.62, 3.0); S.yaw = 0; }
+  S.pitch = 0;
+}
+function goInside(kitchen = false) {
+  fadeThrough(() => { golf?.leave(); S.mode = 'world'; S.pos.set(13.3, 1.62, 3.9); S.yaw = 0; S.pitch = 0; if (kitchen === true) placeIndoors(true); lastHud = ''; $('ghud').innerHTML = ''; showWorldHud(true); wobbleFilter(); });
 }
 // a seat at one of the casino's tables: the game runs in a panel over the room
 function openCasino(kind) {
@@ -879,7 +1057,8 @@ function openGames() {
 }
 function disposeGame() {
   if (!active) return;
-  active.scene.traverse(o => {
+  active.dispose?.();
+  active.scene?.traverse(o => {
     o.geometry?.dispose?.();
     const m = o.material; (Array.isArray(m) ? m : m ? [m] : []).forEach(x => { x.map?.dispose?.(); x.dispose?.(); });
   });
@@ -903,8 +1082,38 @@ function startGame(name, opt = {}) {
 }
 function exitGame(toMenu) {
   if (S.mode !== 'game') return;
+  const overlay = active?.overlay;
   S.mode = 'world'; disposeGame(); showWorldHud(true); wobbleFilter();
-  if (toMenu) openGames(); else lock();
+  if (toMenu && !overlay) openGames(); else lock();
+}
+// Moore's Pizzeria runs in its own full-screen layer with a free mouse, so it skips the 3D game plumbing.
+function startPizza() {
+  if (S.mode !== 'world') return;
+  disposeGame();
+  for (const k in keys) keys[k] = false; stick.f = stick.s = 0;
+  activeName = 'pizza'; activeOpt = {}; lastHud = ''; $('ghud').innerHTML = ''; $('prompt').classList.add('hidden');
+  unlock();
+  active = createPizzeria({ touch: TOUCH, test: TEST, exit: () => exitGame(false), scoreUI: pizzaScoreUI, onRecord: drawKitchenBoard });
+  S.mode = 'game'; wobbleFilter(); setPaused(false); showWorldHud(false); $('controls').classList.remove('show');
+}
+function pizzaScoreUI(el, score) {
+  if (!el) return;
+  el.innerHTML = `${scoreFormHtml()}<ul class="board" style="margin-top:12px;font-size:14px"></ul>`;
+  const form = el.querySelector('form'), board = el.querySelector('.board');
+  fillBoard('pizza', board, 8);
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    let nm = savedInitials();
+    if (!nm) {
+      const inp = el.querySelector('input.ini'); nm = LB.cleanInitials(inp?.value);
+      if (!nm) { if (inp) { inp.value = ''; inp.placeholder = 'Try 3 others'; inp.focus(); } return; }
+      try { localStorage.setItem('mmjr.initials', nm); } catch { /* ignore */ }
+    }
+    form.innerHTML = '<p style="margin:0">Posting…</p>';
+    const ok = await LB.submit('pizza', nm, score);
+    form.innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
+    fillBoard('pizza', board, 8);
+  });
 }
 function showResult(name, r) {
   if (S.mode !== 'game') return;
@@ -940,6 +1149,7 @@ addEventListener('keydown', e => {
   if (typing(e)) { if (e.code === 'Escape') { e.target.blur(); closePanel(); } return; }
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (e.repeat) return;
+  if (S.mode === 'game' && active?.overlay) { active.key(e.code); return; }      // the pizzeria handles its own keys
   keys[e.code] = true;
   if (e.code === 'KeyE' || e.code === 'Escape') {
     if (S.mode === 'panel') closePanel();
@@ -976,7 +1186,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 const tu = { joy: null, look: null };
 function touchUI() {
   const el = $('touch'); if (!el) return;
-  const on = TOUCH && (S.mode === 'world' || S.mode === 'game' || S.mode === 'waking' || S.mode === 'outside');
+  const on = TOUCH && (S.mode === 'world' || S.mode === 'game' || S.mode === 'waking' || S.mode === 'outside') && !(S.mode === 'game' && active?.overlay);
   el.classList.toggle('hidden', !on);
 }
 if (TOUCH) {
@@ -1087,6 +1297,10 @@ function updateWorld(dt) {
     buddy.head.rotation.y = buddy.yaw; buddy.head.rotation.x = Math.sin(S.t * 0.8) * 0.03;
     buddy.head.position.y = 1.19 + Math.sin(S.t * 1.6) * 0.004;
   }
+  if (KIT.fire) {                                  // the pizza oven's fire flickers
+    KIT.fire.intensity = 3.6 + Math.sin(S.t * 9.1) * 0.5 + Math.sin(S.t * 23.7) * 0.3;
+    KIT.flames.forEach((f, i) => { f.scale.y = 0.85 + Math.sin(S.t * (7 + i * 1.3) + i * 2) * 0.18 + Math.sin(S.t * 17 + i) * 0.07; f.position.y = 1.12 + (f.scale.y - 1) * 0.17; });
+  }
   const moving = S.mode === 'world' && !S.paused;
   const d = S.drinks;
   if (moving) {
@@ -1102,7 +1316,8 @@ function updateWorld(dt) {
     const nx = S.pos.x + vx * dt, nz = S.pos.z + vz * dt;
     if (!blocked(nx, S.pos.z)) S.pos.x = nx;
     if (!blocked(S.pos.x, nz)) S.pos.z = nz;
-    if (!S.seenLiving && S.pos.x > 4.4) { S.seenLiving = true; toast('Welcome to the living room. Look around.', 2600); }
+    if (!S.seenLiving && S.pos.x > 4.4 && S.pos.z > -5) { S.seenLiving = true; toast('Welcome to the living room. Look around.', 2600); }
+    if (!S.seenKitchen && S.pos.z < -5.7) { S.seenKitchen = true; toast('The kitchen. Fire up the pizza oven to open Moore’s Pizzeria.', 3200); }
   }
   const w = d * 0.016;
   camera.position.set(S.pos.x, S.pos.y + (S.mode === 'waking' ? 0 : Math.sin(S.bob) * 0.025), S.pos.z);
@@ -1137,13 +1352,13 @@ function frame(now) {
   }
   if (S.mode === 'game' && active) {
     if (!S.paused) active.update(dt);
-    renderer.render(active.scene, active.camera);
+    if (active?.scene) renderer.render(active.scene, active.camera);
   } else if (golf && (S.mode === 'outside' || (S.mode === 'panel' && panelFrom === 'outside') || (S.mode === 'blackout' && blackFrom === 'outside'))) {
     if ((S.mode === 'outside' && !S.paused) || (S.mode === 'panel' && golf.S.state === 'table')) golf.update(dt);      // a casino table keeps playing under its control dock
     renderer.render(golf.scene, golf.camera);
   } else { updateWorld(dt); renderer.render(scene, camera); }
   // "click to look" hint whenever the mouse is free but you are walking or playing
-  const hint = !FREE && !locked() && !S.paused && (S.mode === 'world' || S.mode === 'game' || S.mode === 'outside') && !$('controls').classList.contains('show');
+  const hint = !FREE && !locked() && !S.paused && (S.mode === 'world' || (S.mode === 'game' && !active?.overlay) || S.mode === 'outside') && !$('controls').classList.contains('show');
   $('clickhint').classList.toggle('hidden', !hint);
   if (hint) $('clickhint').textContent = S.mode === 'game' ? 'Click to play' : 'Click to look around';
   if (TOUCH) {
@@ -1164,4 +1379,4 @@ S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
 // a key you already won on this device is still yours on later visits
 requestAnimationFrame(frame);
 
-if (TEST) window.__g = { goOutside, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
+if (TEST) window.__g = { goOutside, startPizza, travel, KIT, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
