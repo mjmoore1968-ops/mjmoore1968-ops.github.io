@@ -33,6 +33,9 @@ try {
 }
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, TOUCH ? 1.75 : 2));
 renderer.setSize(innerWidth, innerHeight, false);
+// If the graphics card resets, let the browser restore the 3D view instead of giving up on it, then reload cleanly.
+canvas.addEventListener('webglcontextlost', e => e.preventDefault(), false);
+canvas.addEventListener('webglcontextrestored', () => location.reload(), false);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0d14);
@@ -640,7 +643,6 @@ function drawKitchenBoard(rec = pizzaRecord()) {
   noCast(box(scene, 2.4, h, 0.01, wallC, 4.9, h / 2, -5.207)); noCast(box(scene, 1.7, h, 0.01, wallC, 8.55, h / 2, -5.207)); noCast(box(scene, 1.6, h - 2.4, 0.01, wallC, 6.9, 2.8, -5.207));
   noCast(box(scene, 5.5, 0.1, 0.03, 0xf5f1e8, 3.35, 0.05, -5.225)); noCast(box(scene, 1.7, 0.1, 0.03, 0xf5f1e8, 8.55, 0.05, -5.225));
   noCast(box(scene, 8.8, 0.09, 0.07, 0xf8f5ee, cx, h - 0.045, -5.235));
-  lamp(5.0, 2.7, -8.2, 8);
   const navy = 0x24344d, navy2 = 0x2c3e5a, brass = 0xd9b34a, steel = 0xb9bcc4, top = 0xe9e6df;
   const subway = (wd, ht) => { const t = tex(512, 256, (c, W, H) => { c.fillStyle = '#d9d4ca'; c.fillRect(0, 0, W, H); for (let r = 0; r < 8; r++) for (let i = -1; i < 9; i++) { const x = i * 64 + (r % 2) * 32; const g = c.createLinearGradient(0, r * 32, 0, r * 32 + 30); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#ece8e0'); c.fillStyle = g; c.fillRect(x + 2, r * 32 + 2, 60, 28); } });
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(wd / 1.2, ht / 0.6); return t; };
