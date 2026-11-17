@@ -105,13 +105,17 @@ export function createPong(THREE, host) {
     add(new THREE.BoxGeometry(0.018, 0.016, 0.04), skin, 0.042, 0.012, -0.06, wrist); }
   const held = add(new THREE.SphereGeometry(BR, 14, 10), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x777777 }), 0, 0.035, -0.1, wrist);
   arm.rotation.order = 'YXZ';
-  const swatHand = add(new THREE.BoxGeometry(0.11, 0.16, 0.05), L(0xf0c8a6), 0, TOP + 0.2, 0.7); swatHand.visible = false;
+  const swatHand = add(new THREE.BoxGeometry(0.13, 0.17, 0.04), L(0xf0c8a6), 0, TOP + 0.2, 0.7); swatHand.visible = false;
+  for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(0.024, 0.08, 0.03), L(0xf0c8a6), -0.045 + i * 0.03, 0.12, 0, swatHand);       // fingers
+  // a bounce shot coming at you: where it will hit the table, and a glow round the ball (yellow: wait, green: swat now)
+  const bounceMark = flat(new THREE.RingGeometry(0.05, 0.075, 32), B(0xffe066, 0.95), 0, TOP + 0.004, 0); bounceMark.material.depthTest = false; bounceMark.renderOrder = 4; bounceMark.visible = false;
+  const glow = add(new THREE.SphereGeometry(BR * 2.2, 16, 12), B(0xffe066, 0.35), 0, 0, 0); glow.material.depthTest = false; glow.renderOrder = 4; glow.visible = false;
   const pat = host.pat; pat.g.position.set(0, 0, -HL - 0.42); group.add(pat.g);
 
   const P = {
     on: false, turn: 'you', phase: 'aim',          // aim | time | fly | pat | over
     ang: 0, sx: 0, tm: 0, cT: 0, lastPow: null, bounce: false, t: 0, fly: null, msg: '', msgT: 0, wait: 0, winner: null,
-    ballNo: 1, made: 0, lost: 0, cam: 0, patArm: 0, swat: 0, swatLock: false, ringT: 0, throws: 0, flick: 0, gents: { you: false, pat: false },
+    ballNo: 1, made: 0, lost: 0, cam: 0, patArm: 0, swat: 0, swatLock: false, swatCool: 0, early: 0, ringT: 0, throws: 0, flick: 0, gents: { you: false, pat: false },
   };
   const left = k => sets[k].filter(c => c.on).length;
   const say = (m, t = 2) => { P.msg = m; P.msgT = t; };
@@ -135,7 +139,7 @@ export function createPong(THREE, host) {
     P.fly = { who, b, to: { x: to.x, y: yT, z: to.z }, mid, bounce, bounced: false, T2: T * 0.62, t: 0, blocked: false, end: 0, willBlock: who === 'you' && bounce && Math.random() < 0.4, blockAt: 0.3 + Math.random() * 0.2 };
     P.phase = 'fly'; ball.visible = shadow.visible = true; P.throws++; P.swat = 0; P.swatLock = false; hist.length = 0;
     if (who === 'you') P.flick = 0.001;
-    if (who === 'pat' && bounce) say('Bounce! Swat it!', 1.2);
+
   }
   function takeCup(who, c) {                                // a cup comes off the table
     c.on = false; c.gone = 0.001;
@@ -159,7 +163,8 @@ export function createPong(THREE, host) {
   function blocked() {                                      // a bounced ball gets swatted away
     const f = P.fly, b = f.b; f.blocked = true;
     b.vx = (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random()); b.vy = 1.6; b.vz = (f.who === 'you' ? 1 : -1) * 0.8; f.end = 0.9;
-    if (f.who === 'you') { say('Pat swats it away', 1.4); host.line?.(pick(['“Not in my house.”', '“Bounces are fair game.”', '“Get that out of here.”'])); } else { say('Swatted!', 1.4); host.line?.(pick(['“Hey!”', '“Good hands.”'])); }
+    if (f.who === 'pat') P.swat = 0.35;
+    if (f.who === 'you') { say('Pat swats it away', 1.4); host.line?.(pick(['“Not in my house.”', '“Bounces are fair game.”', '“Get that out of here.”'])); } else { say('Swatted! 🖐', 1.6); host.line?.(pick(['“Hey!”', '“Good hands.”'])); }
   }
   function missed() {
     const f = P.fly; if (f.said) return; f.said = true;
@@ -185,8 +190,8 @@ export function createPong(THREE, host) {
     if (P.turn === 'pat') { P.phase = 'pat'; P.wait = 1.35; } else P.phase = 'aim';
   }
   // Pat picks a cup (sometimes a bounce shot) and throws at it with a steady but human hand
-  function patThrow() {
-    const mine = sets.you.filter(c => c.on), t = pick(mine), bounce = Math.random() < 0.2, g = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2832 * Math.random()); };
+  function patThrow(force) {
+    const mine = sets.you.filter(c => c.on), t = pick(mine), bounce = force ?? Math.random() < 0.2, g = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2832 * Math.random()); };
     const s = PAT_SIGMA * (bounce ? 1.15 : 1);
     launch('pat', { x: t.x + g() * s, z: t.z + g() * s }, bounce);
   }
@@ -204,8 +209,9 @@ export function createPong(THREE, host) {
       if (P.phase === 'over') { reset(); say('New game — you throw first', 2.2); host.line?.('“Run it back.”'); return; }
       const f = P.fly;
       if (P.phase === 'fly' && f.who === 'pat' && f.bounce && !f.blocked && !f.inCup && !P.swatLock) {     // your swat at Pat's bounce: only once it has hit the table
+        if (P.swatCool > 0) return;
         P.swat = 0.3;
-        if (!f.bounced) { P.swatLock = true; say('Too early!', 0.9); } else blocked();
+        if (!f.bounced) { P.swatCool = 0.35; P.early = 0.7; } else blocked();
         return;
       }
       if (P.turn === 'you' && P.phase === 'aim') { P.phase = 'time'; P.cT = 0; P.tm = 0; }
@@ -223,16 +229,18 @@ export function createPong(THREE, host) {
     throwAt(x, z, bounce = false) { if (P.turn === 'you' && (P.phase === 'aim' || P.phase === 'time')) launch('you', { x, z }, bounce); },
     patThrow,
     update(dt, s) {
-      P.t += dt; P.msgT -= dt; P.swat -= dt;
+      P.t += dt; P.msgT -= dt; P.swat -= dt; P.swatCool -= dt; P.early -= dt;
+      const incoming = P.phase === 'fly' && P.fly && P.fly.who === 'pat' && P.fly.bounce && !P.fly.blocked && !P.fly.inCup && !P.fly.end;
+      const fdt = incoming ? dt * 0.45 : dt;                       // half speed while you have a bounce shot to swat
       const d = drinks(); P.sx = (Math.sin(P.t * 1.9) * 0.006 + Math.sin(P.t * 3.3) * 0.0025) * (0.35 + d);                // the arrow drifts a little, and a lot more after a few beers
       if (P.phase === 'aim' && P.turn === 'you') P.ang = clamp(P.ang + s * dt * 0.12, -0.22, 0.22);
       else if (P.phase === 'time') { P.cT += dt; const p = (P.cT / SWEEP) % 2; P.tm = p < 1 ? p : 2 - p; }
       else if (P.phase === 'pat') { P.wait -= dt; P.patArm = clamp(1 - P.wait / 0.8, 0, 1); if (P.wait <= 0) patThrow(); }
       if (P.phase === 'fly') {
         const f = P.fly, b = f.b, cups = allCups();
-        f.t += dt;
+        f.t += fdt;
         if (f.inCup) { const c = f.inCup; b.y = Math.max(TOP + CUP_H - 0.03, b.y - dt * 0.25); b.x += (c.x - b.x) * Math.min(1, dt * 10); b.z += (c.z - b.z) * Math.min(1, dt * 10); }   // the ball settles into the beer
-        else for (let n = Math.ceil(Math.min(dt, 0.05) / STEP), i = 0; i < n; i++) {
+        else for (let n = Math.ceil(Math.min(fdt, 0.05) / STEP), i = 0; i < n; i++) {
           if (f.bounce && !f.bounced && b.vy < 0 && b.y + b.vy * STEP - 0.5 * G * STEP * STEP <= TOP + BR && Math.abs(b.z - f.mid.z) < 0.25) {     // the planned bounce: off the table and on towards the cup
             f.bounced = true; b.x += b.vx * STEP; b.z += b.vz * STEP; Object.assign(b, { y: TOP + BR, ...aimVel({ x: b.x, y: TOP + BR, z: b.z }, f.to, f.T2) }); f.tb = f.t; continue;
           }
@@ -248,6 +256,11 @@ export function createPong(THREE, host) {
           const h0 = hist[0]; if (!h0 || Math.hypot(b.x - h0[0], b.y - h0[1], b.z - h0[2]) > 0.035) { hist.unshift([b.x, b.y, b.z]); if (hist.length > TRAIL + 1) hist.length = TRAIL + 1; }     // spaced by distance, so it looks the same at any frame rate
           trail.forEach((m, i) => { const p = hist[i + 1]; m.visible = !!p && !f.inCup; if (p) m.position.set(p[0], p[1], p[2]); });
         }
+      }
+      bounceMark.visible = incoming && !P.fly.bounced; glow.visible = incoming;
+      if (incoming) {
+        const fb = P.fly; if (!fb.bounced) { bounceMark.position.set(fb.mid.x, TOP + 0.004, fb.mid.z); bounceMark.scale.setScalar(1 + Math.sin(P.t * 12) * 0.18); }
+        glow.position.copy(ball.position); glow.material.color.setHex(fb.bounced ? 0x46e07a : 0xffe066); glow.material.opacity = fb.bounced ? 0.5 : 0.32;
       }
       // cups: lift away when taken, wobble when hit, slide into a gentleman's line
       for (const c of allCups()) {
@@ -287,7 +300,7 @@ export function createPong(THREE, host) {
       pat.armR.rotation.x += (armTo - pat.armR.rotation.x) * Math.min(1, dt * 12); pat.armR.rotation.z = swatting ? -0.9 : 0.07;
       const cheer = P.phase === 'over' && P.winner === 'pat'; pat.armL.rotation.x = cheer ? -2.8 : 0; if (cheer) pat.armR.rotation.x = -2.8;
       pat.head.rotation.x = P.phase === 'fly' ? -0.1 : 0.12;
-      swatHand.visible = P.swat > 0; if (swatHand.visible) { const k = 1 - P.swat / 0.3; swatHand.position.set(-0.3 + k * 0.6, TOP + 0.2, 0.72); swatHand.rotation.z = 0.5 - k; }
+      swatHand.visible = P.swat > 0 && P.turn === 'pat'; if (swatHand.visible) { const k = 1 - P.swat / 0.3, bp = ball.position; swatHand.position.set(bp.x - 0.18 + k * 0.36, Math.max(TOP + 0.1, bp.y), bp.z + 0.06); swatHand.rotation.z = 0.6 - k * 1.2; }
       // camera: over the table looking at Pat's cups on your turn; pulled back onto your own cups when he throws
       const o = host.origin, tall = camera.aspect < 1, fov = tall ? 74 : 50, over = P.phase === 'over';
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -296,7 +309,7 @@ export function createPong(THREE, host) {
       // HUD
       const lit = ' style="border-color:#f2b441;box-shadow:0 0 0 1px #f2b441"', balls = `<i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-left:5px;vertical-align:0"></i>`;
       let html = `<div class="g-top"><div class="pill"${P.turn === 'you' && !over ? lit : ''}>You: ${left('you')} cups${P.turn === 'you' && !over ? balls.repeat(3 - P.ballNo - (P.phase === 'fly' ? 1 : 0)) : ''}</div><div class="pill"${P.turn === 'pat' && !over ? lit : ''}>Pat: ${left('pat')} cups${P.turn === 'pat' && !over ? balls.repeat(Math.max(0, 3 - P.ballNo - (P.phase === 'fly' ? 1 : 0))) : ''}</div></div>`;
-      if (P.msgT > 0) html += `<div class="g-msg" style="top:15%;font-size:28px">${P.msg}</div>`;
+      if (P.msgT > 0 && !incoming) html += `<div class="g-msg" style="top:15%;font-size:28px">${P.msg}</div>`;
       if (over) html += `<div class="g-prompt" style="top:auto;bottom:70px">${host.touch ? 'REMATCH — play again · ✕ to walk away' : 'Click for a rematch · <kbd>E</kbd> to walk away'}</div>`;
       else if (mine) {
         const pos = host.touch ? 'top:58px' : 'bottom:54px';
@@ -304,7 +317,13 @@ export function createPong(THREE, host) {
         html += `<div class="g-prompt" style="top:auto;bottom:${host.touch ? 'auto;top:100px' : '92px'};font-size:12.5px">${P.bounce ? 'Bounce shot: worth 2 cups, but Pat can swat it' : 'Lob shot'}${host.touch ? '' : ' · <kbd>B</kbd> switches'}</div>`;
         html += `<div class="g-tip">${host.touch ? 'Drag to point the arrow · hold THROW and let go when the target is over a cup' : P.phase === 'time' ? 'Let go when the target is over a cup — it glows green when you are dead on' : 'Mouse or A/D points the arrow · hold click and let go at the right power · B for a bounce shot · E walks away'}</div>`;
       } else if (P.phase === 'pat') html += `<div class="g-prompt" style="top:auto;bottom:70px">Pat is lining one up…</div>`;
-      else if (P.phase === 'fly' && P.fly && P.fly.who === 'pat' && P.fly.bounce && !P.fly.blocked && !P.fly.inCup && !P.swatLock) html += `<div class="g-prompt" style="top:auto;bottom:70px">${host.touch ? 'Tap SWAT when it bounces!' : 'Click to swat it once it bounces!'}</div>`;
+      if (incoming) {
+        const now = P.fly.bounced, how = host.touch ? 'tap SWAT' : 'click or press Space';
+        html += `<div style="position:absolute;left:50%;bottom:${host.touch ? 30 : 14}%;transform:translateX(-50%);text-align:center;pointer-events:none;background:rgba(10,12,18,.62);border-radius:16px;padding:10px 22px">
+          <div style="font:800 ${now ? 46 : 26}px Georgia,serif;color:${now ? '#46e07a' : '#ffe066'};text-shadow:0 2px 12px rgba(0,0,0,.7)">${now ? 'SWAT NOW!' : 'Bounce shot incoming!'}</div>
+          <div style="margin-top:6px;font-size:14px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.8)">${now ? how : `Wait for it to hit the table at the <b style="color:#ffe066">yellow ring</b>, then ${how}`}</div>
+          ${P.early > 0 ? '<div style="margin-top:6px;font-size:14px;color:#ff9a9a;font-weight:700">Too early — wait for the bounce</div>' : ''}</div>`;
+      }
       return html;
     },
   };
