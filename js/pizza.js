@@ -37,6 +37,7 @@ const BAKE_RATE = 1 / 30;            // average bake per second; the half facing
 const PERFECT = 0.035;               // the green band on the bake dial is target +/- this
 
 // grids for sauce and cheese coverage: N x N cells over the square [-UMAX, UMAX] in pie units (1 = a full-size pie)
+const BRUSH = { sauce: 0.24, cheese: 0.22 };       // brush radius in pie units (the coverage grid uses a hair less)
 const N = 60, UMAX = 1.2, CS = 2 * UMAX / N, MS = 320, MK = MS / (2 * UMAX), MASTER = 520, SPR = 128;
 
 const REGULARS = [
@@ -66,7 +67,7 @@ const LINES = {
 };
 const HOWTO = [
   '<b>Order.</b> Customers line up at the counter. Take the order and a ticket drops onto the rail up top.',
-  '<b>Build.</b> Pick a ticket. Hold on the dough to stretch it to the dashed ring (it tears if you overdo it). Paint on sauce, then cheese, then drop each topping where the ticket shows it: the whole pie, the left half or the right half. Count carefully and spread them out.',
+  '<b>Build.</b> Pick a ticket. Hold on the dough to stretch it to the dashed ring (it tears if you overdo it). Press and hold to spread the sauce, then the cheese (or drag to paint them by hand), then drop each topping where the ticket shows it: the whole pie, the left half or the right half. Count carefully and spread them out.',
   '<b>Bake.</b> Slide it into the wood-fired oven. The fire is at the back, so turn each pie once, about halfway, for an even bake. Pull it when the needle is in the green.',
   '<b>Cut.</b> Drag straight across the pie, through the middle. The ticket says 4, 6 or 8 slices; space the cuts evenly.',
   '<b>Serve.</b> Every pie is scored on wait, build, bake and cut. The trick is multitasking: take orders and build the next pie while the oven works.',
@@ -176,21 +177,21 @@ function stamp(pz, kind, ux, uy) {
   const c = (kind === 'sauce' ? pz.sauce : pz.cheese).getContext('2d');
   const x = (ux + UMAX) * MK, y = (uy + UMAX) * MK;
   if (kind === 'sauce') {
-    const r = 0.17 * MK, g = c.createRadialGradient(x, y, 0, x, y, r);
+    const r = BRUSH.sauce * MK, g = c.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, 'rgba(176,36,22,.95)'); g.addColorStop(0.7, 'rgba(188,48,28,.85)'); g.addColorStop(1, 'rgba(188,48,28,0)');
     c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
     if (Math.random() < 0.5) { c.fillStyle = Math.random() < 0.5 ? 'rgba(90,30,14,.6)' : 'rgba(224,100,64,.55)'; c.beginPath(); c.arc(x + rand(-r, r) * 0.6, y + rand(-r, r) * 0.6, rand(0.6, 1.6), 0, TAU); c.fill(); }
-    markGrid(pz.sGrid, ux, uy, 0.16); pz.sauceUsed = true;
+    markGrid(pz.sGrid, ux, uy, BRUSH.sauce - 0.01); pz.sauceUsed = true;
   } else {
-    const r = 0.15 * MK, g = c.createRadialGradient(x, y, 0, x, y, r);
+    const r = BRUSH.cheese * MK, g = c.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, 'rgba(250,226,146,.6)'); g.addColorStop(0.75, 'rgba(248,220,132,.45)'); g.addColorStop(1, 'rgba(248,220,132,0)');
     c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
     c.lineCap = 'round'; c.lineWidth = 0.022 * MK;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 16; i++) {
       const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * r * 0.9, px = x + Math.cos(a) * d, py = y + Math.sin(a) * d, b = Math.random() * TAU, L = rand(0.03, 0.06) * MK;
       c.strokeStyle = pick(['#fbe7a1', '#f6d77a', '#f1c95c', '#fff3c6']); c.beginPath(); c.moveTo(px - Math.cos(b) * L, py - Math.sin(b) * L); c.lineTo(px + Math.cos(b) * L, py + Math.sin(b) * L); c.stroke();
     }
-    markGrid(pz.cGrid, ux, uy, 0.14); pz.cheeseUsed = true;
+    markGrid(pz.cGrid, ux, uy, BRUSH.cheese - 0.01); pz.cheeseUsed = true;
   }
   pz.ver++;
 }
@@ -268,8 +269,8 @@ function scoreBuild(pz) {
   const dough = pz.torn ? 0 : clamp(1 - Math.abs(d - 1) / 0.13, 0, 1);
   det.push(['Dough', `${Math.round(d * 100)}% of the ring`, dough]);
   const sc = coverage(pz.sGrid, d), cc = coverage(pz.cGrid, d);
-  const sauce = clamp((sc.cov - 0.55) / 0.35, 0, 1) * clamp(1 - Math.max(0, sc.spill - 0.08) * 1.1, 0, 1);
-  const cheese = clamp((cc.cov - 0.55) / 0.35, 0, 1) * clamp(1 - Math.max(0, cc.spill - 0.08) * 1.1, 0, 1);
+  const sauce = clamp((sc.cov - 0.5) / 0.35, 0, 1) * clamp(1 - Math.max(0, sc.spill - 0.08) * 1.1, 0, 1);
+  const cheese = clamp((cc.cov - 0.5) / 0.35, 0, 1) * clamp(1 - Math.max(0, cc.spill - 0.08) * 1.1, 0, 1);
   det.push(['Sauce', `${Math.round(sc.cov * 100)}% covered${sc.spill > 0.08 ? `, ${Math.round(sc.spill * 100)}% on the crust` : ''}`, sauce]);
   det.push(['Cheese', `${Math.round(cc.cov * 100)}% covered${cc.spill > 0.08 ? `, ${Math.round(cc.spill * 100)}% on the crust` : ''}`, cheese]);
   let pen = 0, sum = 0;
@@ -631,7 +632,7 @@ export function createPizzeria(ctx = {}) {
   /* ---------------- stations */
   function setStation(st) {
     if (G.station === st) return;
-    G.station = st; G.stretching = false; G.painting = null; G.cutDrag = null; G.ptr = null; dirtyTray = true;
+    G.station = st; G.stretching = false; G.painting = null; G.spread = null; G.cutDrag = null; G.ptr = null; dirtyTray = true;
     if (st === 'build' && !G.board) { const o = G.sel?.status === 'new' ? G.sel : G.orders.find(q => q.status === 'new'); if (o) startPizza(o); }
     root.querySelectorAll('#pzTabs button').forEach(b => b.classList.toggle('on', b.dataset.st === st));
     renderPin(); layout(); sfx('click');
@@ -642,7 +643,7 @@ export function createPizzeria(ctx = {}) {
   }
   function trashPizza() {
     const pz = G.board; if (!pz) return;
-    pz.order.status = 'new'; pz.order.pz = null; G.board = null; G.stretching = false; G.painting = null; dirtyRail = true; dirtyTray = true; renderPin();
+    pz.order.status = 'new'; pz.order.pz = null; G.board = null; G.stretching = false; G.painting = null; G.spread = null; dirtyRail = true; dirtyTray = true; renderPin();
     say('Into the bin', W / 2, H / 2, '#ffb3a8'); sfx('tear');
   }
   function toOven() {
@@ -815,7 +816,7 @@ export function createPizzeria(ctx = {}) {
   /* ---------------- modals */
   function modal(html, dark = false) {
     G.modal = true; const card = $('#pzCard'); card.className = 'pzCard' + (dark ? ' dark' : ''); card.innerHTML = html; $('#pzModal').classList.remove('hidden'); card.scrollTop = 0;
-    G.stretching = false; G.painting = null; G.cutDrag = null;
+    G.stretching = false; G.painting = null; G.spread = null; G.cutDrag = null;
   }
   function closeModal() { G.modal = null; $('#pzModal').classList.add('hidden'); }
   function intro() {
@@ -896,6 +897,20 @@ export function createPizzeria(ctx = {}) {
     if (pz && G.stretching && !pz.torn && !pz.locked) {
       G.hold += dt; pz.d += (0.35 + 0.6 * G.hold) * dt * 0.62; pz.ver++;
       if (pz.d > 1.14) { pz.torn = true; pz.tornT = 0; G.stretching = false; pz.ver++; say('It tore!', L.cx, L.cy - L.R * 0.2, '#ffb3a8'); sfx('tear'); dirtyTray = true; }
+    }
+    // holding still with the ladle or the cheese spreads it in a spiral from the middle out, stopping short of the crust
+    const sp = G.spread;
+    if (pz && sp && !sp.manual && !sp.finished) {
+      sp.t += dt; const T0 = 0.12, DUR = 0.85, rMax = Math.max(0, 0.84 * pz.d - BRUSH[sp.kind] + 0.05);
+      while (sp.done < Math.min(sp.t, T0 + DUR + 0.25) - T0) {
+        sp.done += 1 / 240; const f = Math.min(1, sp.done / DUR), r = f * rMax, a = sp.done * TAU * 5;
+        stamp(pz, sp.kind, Math.cos(a) * r, Math.sin(a) * r);
+      }
+      if (sp.t >= T0 + DUR + 0.25) {
+        sp.finished = true; sfx('plop');
+        say(sp.kind === 'sauce' ? 'Sauced!' : 'Cheesed!', L.cx, L.cy - L.R * 1.1, '#9ff0bf');
+        G.tool = sp.kind === 'sauce' ? 'cheese' : (pz.order.reqs[0]?.k || 'cheese'); dirtyTray = true;   // straight on to the next step
+      }
     }
     if (pz && pz.torn) { pz.tornT += dt; if (pz.tornT > 1.1) { const o = pz.order; G.board = newPizza(o); o.pz = G.board; G.tool = 'dough'; dirtyTray = true; say('Fresh dough', L.cx, L.cy, '#ffe9b0'); } }
     // the oven
@@ -1052,10 +1067,11 @@ export function createPizzeria(ctx = {}) {
     if (pz.order.reqs.some(q => q.reg !== 'all')) { c.save(); c.setLineDash([6, 7]); c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx, cy - pz.d * R); c.lineTo(cx, cy + pz.d * R); c.stroke(); c.restore();
       c.fillStyle = 'rgba(60,35,15,.6)'; c.font = `800 ${Math.max(11, R * 0.06)}px ui-sans-serif, system-ui`; c.textAlign = 'center'; c.fillText('LEFT', cx - R * 0.6, cy - R * 1.08); c.fillText('RIGHT', cx + R * 0.6, cy - R * 1.08); }
     if (!pz.locked && G.tool === 'dough' && !G.stretching && pz.d < 0.9) { c.fillStyle = 'rgba(42,29,18,.85)'; c.font = `800 ${Math.max(13, R * 0.08)}px ui-sans-serif, system-ui`; c.textAlign = 'center'; c.fillText(ctx.touch ? 'Press and hold to stretch' : 'Hold the mouse down to stretch', cx, cy + R * 1.08 + 12); }
+    if ((G.tool === 'sauce' || G.tool === 'cheese') && !G.painting && coverage(G.tool === 'sauce' ? pz.sGrid : pz.cGrid, pz.d).cov < 0.85) { c.fillStyle = 'rgba(42,29,18,.85)'; c.font = `800 ${Math.max(13, R * 0.08)}px ui-sans-serif, system-ui`; c.textAlign = 'center'; c.fillText(`Hold to spread the ${G.tool} · or drag to paint`, cx, cy + R * 1.08 + 12); }
     // what is under the pointer
     const p = G.ptr;
     if (p && p.inside && !ctx.touch) {
-      if (G.tool === 'sauce' || G.tool === 'cheese') { c.strokeStyle = G.tool === 'sauce' ? 'rgba(190,40,20,.8)' : 'rgba(230,180,40,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y, (G.tool === 'sauce' ? 0.17 : 0.15) * R, 0, TAU); c.stroke(); }
+      if (G.tool === 'sauce' || G.tool === 'cheese') { c.strokeStyle = G.tool === 'sauce' ? 'rgba(190,40,20,.8)' : 'rgba(230,180,40,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y, BRUSH[G.tool] * R, 0, TAU); c.stroke(); }
       else if (T[G.tool]) { const s = T[G.tool].r * R * 2 * (SPR / 2) / 52; c.globalAlpha = 0.55; c.drawImage(SPRITES[G.tool][0], p.x - s / 2, p.y - s / 2, s, s); c.globalAlpha = 1; }
     }
   }
@@ -1166,7 +1182,7 @@ export function createPizzeria(ctx = {}) {
       const u = toU(p);
       if (G.tool === 'dough') { if (pz.locked) return; G.stretching = true; G.hold = 0; return; }
       if (pz.d < 0.75) { say('Stretch the dough first', p.x, p.y, '#ffd27a'); G.tool = 'dough'; dirtyTray = true; return; }
-      if (G.tool === 'sauce' || G.tool === 'cheese') { if (!pz.locked) { pz.locked = true; dirtyTray = true; } G.painting = G.tool; G.last = u; stamp(pz, G.tool, u.x, u.y); return; }
+      if (G.tool === 'sauce' || G.tool === 'cheese') { if (!pz.locked) { pz.locked = true; dirtyTray = true; } G.painting = G.tool; G.last = u; G.spread = { kind: G.tool, t: 0, done: 0, sx: p.x, sy: p.y, manual: false }; return; }
       if (T[G.tool]) {
         if (Math.hypot(u.x, u.y) > pz.d * 1.02) { say('Missed the pie', p.x, p.y, '#ffd27a'); return; }
         if (!pz.locked) pz.locked = true; pz.tops.push({ k: G.tool, x: u.x, y: u.y, a: Math.random() * TAU, v: (Math.random() * 3) | 0 }); pz.ver++; dirtyTray = true; sfx('plop');
@@ -1186,7 +1202,10 @@ export function createPizzeria(ctx = {}) {
   }
   function move(p) {
     G.ptr = { ...p, inside: inStage(p) };
-    if (G.painting && G.board) {
+    if (G.spread && !G.spread.manual && Math.hypot(p.x - G.spread.sx, p.y - G.spread.sy) > 10) {   // they moved: paint by hand from here
+      G.spread.manual = true; if (G.board) stamp(G.board, G.painting, G.last.x, G.last.y);
+    }
+    if (G.painting && G.board && (!G.spread || G.spread.manual)) {
       const u = toU(p), pz = G.board, l = G.last, dist = Math.hypot(u.x - l.x, u.y - l.y), steps = Math.ceil(dist / 0.045);
       for (let i = 1; i <= steps; i++) stamp(pz, G.painting, lerp(l.x, u.x, i / steps), lerp(l.y, u.y, i / steps));
       G.last = u;
@@ -1195,7 +1214,8 @@ export function createPizzeria(ctx = {}) {
   }
   function up() {
     if (G.stretching) { G.stretching = false; const pz = G.board; if (pz && !pz.torn && pz.d >= 0.85) { G.tool = 'sauce'; dirtyTray = true; if (Math.abs(pz.d - 1) <= 0.04) say('Perfect size!', L.cx, L.cy - L.R * 1.12, '#9ff0bf'); } }
-    G.painting = null;
+    if (G.spread && !G.spread.manual && G.spread.t < 0.12 && G.board) stamp(G.board, G.spread.kind, G.last.x, G.last.y);   // a quick tap still dabs
+    G.painting = null; G.spread = null;
     const d = G.cutDrag; G.cutDrag = null;
     if (d && G.cutBoard) {
       const pz = G.cutBoard, dx = d.x1 - d.x0, dy = d.y1 - d.y0, len = Math.hypot(dx, dy), scale = L.R / pz.d;
