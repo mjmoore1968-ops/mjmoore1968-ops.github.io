@@ -821,7 +821,7 @@ export function createGolf(THREE, ctx) {
       S.state = 'cart';
     } else if (k === 'ball') { standBy(); address(); }
     else if (k === 'next') { if (!fromClick) goNext(); }
-    else if (k === 'club') { ctx.fade?.(); reset(); }
+    else if (k === 'club') { const go = () => { ctx.fade?.(); reset(); }; if (ctx.askInitials) ctx.askInitials(go); else go(); }   // who's playing, then tee off
     else if (k === 'door') ctx.goInside?.();
     else if (k === 'bar') enterBar();
     else if (k === 'casino') enterCasino();

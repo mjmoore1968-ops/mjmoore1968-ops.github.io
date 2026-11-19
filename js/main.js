@@ -949,7 +949,7 @@ function fadeThrough(mid) {
 }
 function goOutside(after) {
   fadeThrough(() => {
-    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drink, drinks: () => S.drinks, casino: openCasino,
+    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, askInitials: go => askInitials('Story St. Golf Club', () => { closePanel(); go(); }), goInside, toast, drink, drinks: () => S.drinks, casino: openCasino,
       fade() { const b = $('black'); b.style.transition = 'none'; b.style.opacity = 1; requestAnimationFrame(() => { b.style.transition = 'opacity .7s ease'; b.style.opacity = 0; }); } });
     golf.camera.aspect = innerWidth / innerHeight; golf.camera.updateProjectionMatrix();
     golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter(); if (typeof after === 'function') after();
@@ -991,19 +991,12 @@ function golfFinish(r) {
     <table class="card"><tr><th>Hole</th>${r.pars.map((_, i) => `<td>${i + 1}</td>`).join('')}<td>Out</td></tr>
       <tr><th>Par</th>${r.pars.map(p => `<td>${p}</td>`).join('')}<td>${par}</td></tr>
       <tr><th>You</th>${r.card.map((v, i) => cell(v, r.pars[i])).join('')}<td>${total}</td></tr></table>
-    ${scoreFormHtml()}
+    <div id="postStatus"></div>
     <ul class="board" id="resBoard" style="margin-top:16px;font-size:14px"></ul>
     <div class="row" style="justify-content:flex-start;margin-top:16px"><button class="btn small" id="again">Play another round</button></div>`);
   fillBoard('golf', $('resBoard'), 8);
   $('again').addEventListener('click', () => { closePanel(); golf.reset(); });
-  $('scoreForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const nm = readInitials(); if (!nm) return;
-    $('scoreForm').innerHTML = '<p style="margin:0">Posting…</p>';
-    const ok = await LB.submit('golf', nm, total);
-    $('scoreForm').innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
-    fillBoard('golf', $('resBoard'), 8);
-  });
+  autoPost('golf', total, $('postStatus'), $('resBoard'));
 }
 function openInstagram() {
   const b = $('black'); b.style.transition = 'none'; b.style.background = '#fff'; b.style.opacity = 0.9;       // camera flash
@@ -1028,6 +1021,43 @@ function scoreFormHtml() {
       <div><label for="pName">Your 3 initials (used for every score from now on)</label>
       <input id="pName" class="ini" maxlength="3" minlength="3" required pattern="[A-Za-z0-9]{3}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
       <button class="btn" type="submit">Post score</button></form>`;
+}
+// Every leaderboard game asks who is playing before it starts (pre-filled with last time's initials),
+// then posts the score on its own when the game ends.
+function setPlayer(v) {
+  const ini = LB.cleanInitials(v); if (!ini) return '';
+  try { localStorage.setItem('mmjr.initials', ini); } catch { /* ignore */ }
+  return ini;
+}
+function askInitials(title, go) {
+  const had = savedInitials();
+  openPanel(`
+    <h2>${esc(title)}</h2>
+    <p>Who’s playing? Your score posts to the leaderboard automatically when the game ends.</p>
+    <form id="whoForm" class="row" style="justify-content:flex-start;align-items:flex-end">
+      <div><label for="pName">Your 3 initials</label>
+      <input id="pName" class="ini" maxlength="3" value="${had}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <button class="btn" type="submit">Play</button></form>`);
+  const inp = $('pName'); setTimeout(() => { inp.focus(); inp.select(); }, 30);
+  $('whoForm').addEventListener('submit', e => {
+    e.preventDefault();
+    if (!setPlayer(inp.value)) { inp.value = ''; inp.placeholder = 'Try 3 others'; inp.focus(); return; }
+    inp.blur(); go();
+  });
+}
+function autoPost(game, score, el, boardEl) {
+  if (!el) return;
+  const nm = savedInitials();
+  if (!nm) {                                                     // never set (shouldn't happen): fall back to the form
+    el.innerHTML = scoreFormHtml();
+    el.querySelector('form').addEventListener('submit', e => { e.preventDefault(); if (readInitials()) autoPost(game, score, el, boardEl); });
+    return;
+  }
+  el.innerHTML = `<p style="margin:0">Posting as <b class="ini">${esc(nm)}</b>…</p>`;
+  LB.submit(game, nm, score).then(ok => {
+    el.innerHTML = `<p style="margin:0">${ok ? `Posted to the leaderboard as <b class="ini">${esc(nm)}</b>.` : 'Saved on this device. The global board could not be reached.'}</p>`;
+    fillBoard(game, boardEl, 8);
+  });
 }
 function readInitials() {
   const had = savedInitials(); if (had) return had;
@@ -1054,7 +1084,7 @@ function openGames() {
         ${play(g)}
         <ul class="board" id="board-${g}"></ul></div>`).join('')}
     </div>`);
-  document.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => startGame(b.dataset.play, b.dataset.vehicle ? { vehicle: b.dataset.vehicle } : {})));
+  document.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => playGame(b.dataset.play, b.dataset.vehicle ? { vehicle: b.dataset.vehicle } : {})));
   Object.keys(MAKERS).forEach(g => fillBoard(g, $('board-' + g)));
 }
 function disposeGame() {
@@ -1072,6 +1102,7 @@ const ctx = {
   hud(html) { if (html !== lastHud) { lastHud = html; $('ghud').innerHTML = html; } },
   finish(result) { showResult(activeName, result); },
 };
+function playGame(name, opt = {}) { askInitials(LB.GAMES[name].title, () => startGame(name, opt)); }
 function startGame(name, opt = {}) {
   disposeGame();
   $('panel').classList.add('hidden'); panelClose = null;
@@ -1095,27 +1126,13 @@ function startPizza() {
   for (const k in keys) keys[k] = false; stick.f = stick.s = 0;
   activeName = 'pizza'; activeOpt = {}; lastHud = ''; $('ghud').innerHTML = ''; $('prompt').classList.add('hidden');
   unlock();
-  active = createPizzeria({ touch: TOUCH, test: TEST, exit: () => exitGame(false), scoreUI: pizzaScoreUI, onRecord: drawKitchenBoard });
+  active = createPizzeria({ touch: TOUCH, test: TEST, player: savedInitials, setPlayer, exit: () => exitGame(false), scoreUI: pizzaScoreUI, onRecord: drawKitchenBoard });
   S.mode = 'game'; wobbleFilter(); setPaused(false); showWorldHud(false); $('controls').classList.remove('show');
 }
 function pizzaScoreUI(el, score) {
   if (!el) return;
-  el.innerHTML = `${scoreFormHtml()}<ul class="board" style="margin-top:12px;font-size:14px"></ul>`;
-  const form = el.querySelector('form'), board = el.querySelector('.board');
-  fillBoard('pizza', board, 8);
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    let nm = savedInitials();
-    if (!nm) {
-      const inp = el.querySelector('input.ini'); nm = LB.cleanInitials(inp?.value);
-      if (!nm) { if (inp) { inp.value = ''; inp.placeholder = 'Try 3 others'; inp.focus(); } return; }
-      try { localStorage.setItem('mmjr.initials', nm); } catch { /* ignore */ }
-    }
-    form.innerHTML = '<p style="margin:0">Posting…</p>';
-    const ok = await LB.submit('pizza', nm, score);
-    form.innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
-    fillBoard('pizza', board, 8);
-  });
+  el.innerHTML = `<div class="postStatus"></div><ul class="board" style="margin-top:12px;font-size:14px"></ul>`;
+  autoPost('pizza', score, el.querySelector('.postStatus'), el.querySelector('.board'));
 }
 function showResult(name, r) {
   if (S.mode !== 'game') return;
@@ -1125,24 +1142,16 @@ function showResult(name, r) {
     <h2>${g.title}</h2>
     <div class="big">${esc(r.headline)}</div>
     <p>${esc(r.text || '')}</p>
-    ${r.submit === false ? '' : `
-    ${scoreFormHtml()}`}
+    ${r.submit === false ? '' : '<div id="postStatus"></div>'}
     <ul class="board" id="resBoard" style="margin-top:16px;font-size:14px"></ul>
     <div class="row" style="justify-content:flex-start;margin-top:16px">
       <button class="btn small" id="again">Play again</button>
       <button class="btn ghost small" id="menu">All games</button>
     </div>`, disposeGame);
   fillBoard(name, $('resBoard'), 8);
-  $('again').addEventListener('click', () => startGame(name, opt));
+  $('again').addEventListener('click', () => playGame(name, opt));
+  if (r.submit !== false) autoPost(name, r.score, $('postStatus'), $('resBoard'));
   $('menu').addEventListener('click', () => { disposeGame(); openGames(); });
-  $('scoreForm')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const nm = readInitials(); if (!nm) return;
-    $('scoreForm').innerHTML = '<p style="margin:0">Posting…</p>';
-    const ok = await LB.submit(name, nm, r.score);
-    $('scoreForm').innerHTML = `<p style="margin:0">${ok ? 'Posted as ' + esc(nm) + '.' : 'Saved on this device. The global board could not be reached.'}</p>`;
-    fillBoard(name, $('resBoard'), 8);
-  });
 }
 
 /* ------------------------------------------------------------------ input: keyboard + mouse */
@@ -1381,4 +1390,4 @@ S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
 // a key you already won on this device is still yours on later visits
 requestAnimationFrame(frame);
 
-if (TEST) window.__g = { goOutside, startPizza, travel, KIT, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
+if (TEST) window.__g = { goOutside, startPizza, playGame, askInitials, showResult, travel, KIT, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
