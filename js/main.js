@@ -949,7 +949,7 @@ function fadeThrough(mid) {
 }
 function goOutside(after) {
   fadeThrough(() => {
-    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, askInitials: go => askInitials('Story St. Golf Club', () => { closePanel(); go(); }), goInside, toast, drink, drinks: () => S.drinks, casino: openCasino,
+    if (!golf) golf = createGolf(THREE, { ...ctx, finish: golfFinish, goInside, toast, drink, drinks: () => S.drinks, casino: openCasino,
       fade() { const b = $('black'); b.style.transition = 'none'; b.style.opacity = 1; requestAnimationFrame(() => { b.style.transition = 'opacity .7s ease'; b.style.opacity = 0; }); } });
     golf.camera.aspect = innerWidth / innerHeight; golf.camera.updateProjectionMatrix();
     golf.enter(); S.mode = 'outside'; lastHud = ''; showWorldHud(false); wobbleFilter(); if (typeof after === 'function') after();
@@ -1022,41 +1022,30 @@ function scoreFormHtml() {
       <input id="pName" class="ini" maxlength="3" minlength="3" required pattern="[A-Za-z0-9]{3}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
       <button class="btn" type="submit">Post score</button></form>`;
 }
-// Every leaderboard game asks who is playing before it starts (pre-filled with last time's initials),
-// then posts the score on its own when the game ends.
+// When a leaderboard game ends, the results ask for your 3 initials (filled in with last time's), and entering them posts the score.
 function setPlayer(v) {
   const ini = LB.cleanInitials(v); if (!ini) return '';
   try { localStorage.setItem('mmjr.initials', ini); } catch { /* ignore */ }
   return ini;
 }
-function askInitials(title, go) {
-  const had = savedInitials();
-  openPanel(`
-    <h2>${esc(title)}</h2>
-    <p>Who’s playing? Your score posts to the leaderboard automatically when the game ends.</p>
-    <form id="whoForm" class="row" style="justify-content:flex-start;align-items:flex-end">
-      <div><label for="pName">Your 3 initials</label>
-      <input id="pName" class="ini" maxlength="3" value="${had}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
-      <button class="btn" type="submit">Play</button></form>`);
-  const inp = $('pName'); setTimeout(() => { inp.focus(); inp.select(); }, 30);
-  $('whoForm').addEventListener('submit', e => {
-    e.preventDefault();
-    if (!setPlayer(inp.value)) { inp.value = ''; inp.placeholder = 'Try 3 others'; inp.focus(); return; }
-    inp.blur(); go();
-  });
-}
 function autoPost(game, score, el, boardEl) {
   if (!el) return;
-  const nm = savedInitials();
-  if (!nm) {                                                     // never set (shouldn't happen): fall back to the form
-    el.innerHTML = scoreFormHtml();
-    el.querySelector('form').addEventListener('submit', e => { e.preventDefault(); if (readInitials()) autoPost(game, score, el, boardEl); });
-    return;
-  }
-  el.innerHTML = `<p style="margin:0">Posting as <b class="ini">${esc(nm)}</b>…</p>`;
-  LB.submit(game, nm, score).then(ok => {
-    el.innerHTML = `<p style="margin:0">${ok ? `Posted to the leaderboard as <b class="ini">${esc(nm)}</b>.` : 'Saved on this device. The global board could not be reached.'}</p>`;
-    fillBoard(game, boardEl, 8);
+  el.innerHTML = `<form class="row postForm" style="justify-content:flex-start;align-items:flex-end;margin-top:6px">
+      <div><label>Your 3 initials for the leaderboard</label>
+      <input class="ini" maxlength="3" value="${savedInitials()}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <button class="btn" type="submit">Post score</button></form>`;
+  const form = el.querySelector('form'), inp = el.querySelector('input');
+  setTimeout(() => { inp.focus(); inp.select(); }, 60);
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const nm = setPlayer(inp.value);
+    if (!nm) { inp.value = ''; inp.placeholder = 'Try 3 others'; inp.focus(); return; }
+    inp.blur();
+    el.innerHTML = `<p style="margin:0">Posting as <b class="ini">${esc(nm)}</b>…</p>`;
+    LB.submit(game, nm, score).then(ok => {
+      el.innerHTML = `<p style="margin:0">${ok ? `Posted to the leaderboard as <b class="ini">${esc(nm)}</b>.` : 'Saved on this device. The global board could not be reached.'}</p>`;
+      fillBoard(game, boardEl, 8);
+    });
   });
 }
 function readInitials() {
@@ -1102,7 +1091,7 @@ const ctx = {
   hud(html) { if (html !== lastHud) { lastHud = html; $('ghud').innerHTML = html; } },
   finish(result) { showResult(activeName, result); },
 };
-function playGame(name, opt = {}) { askInitials(LB.GAMES[name].title, () => startGame(name, opt)); }
+function playGame(name, opt = {}) { startGame(name, opt); }
 function startGame(name, opt = {}) {
   disposeGame();
   $('panel').classList.add('hidden'); panelClose = null;
@@ -1126,7 +1115,7 @@ function startPizza() {
   for (const k in keys) keys[k] = false; stick.f = stick.s = 0;
   activeName = 'pizza'; activeOpt = {}; lastHud = ''; $('ghud').innerHTML = ''; $('prompt').classList.add('hidden');
   unlock();
-  active = createPizzeria({ touch: TOUCH, test: TEST, player: savedInitials, setPlayer, exit: () => exitGame(false), scoreUI: pizzaScoreUI, onRecord: drawKitchenBoard });
+  active = createPizzeria({ touch: TOUCH, test: TEST, exit: () => exitGame(false), scoreUI: pizzaScoreUI, onRecord: drawKitchenBoard });
   S.mode = 'game'; wobbleFilter(); setPaused(false); showWorldHud(false); $('controls').classList.remove('show');
 }
 function pizzaScoreUI(el, score) {
@@ -1390,4 +1379,4 @@ S.limit = 8 + Math.floor(Math.random() * 5); lids(0); touchUI(); showControls();
 // a key you already won on this device is still yours on later visits
 requestAnimationFrame(frame);
 
-if (TEST) window.__g = { goOutside, startPizza, playGame, askInitials, showResult, travel, KIT, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };
+if (TEST) window.__g = { goOutside, startPizza, playGame, showResult, travel, KIT, get golf() { return golf; }, S, keys, stick, openDoor, drink, startGame, openGames, openEmail, closePanel, exitGame, get active() { return active; }, camera, DOOR, colliders };

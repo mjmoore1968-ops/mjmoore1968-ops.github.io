@@ -461,9 +461,6 @@ const CSS = `
 .pzCard kbd{display:inline-block;min-width:20px;padding:1px 6px;border-radius:5px;border:1px solid #d8c8ae;background:#f3e7d1;color:#2a1d12;font:700 12px ui-monospace,Menlo,monospace;text-align:center}
 .pzCard ol,.pzCard ul.how{margin:8px 0 14px;padding-left:20px;line-height:1.5;font-size:14px}.pzCard li{margin:5px 0}
 .pzCard .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.pzCard .acts>*{flex:1;min-width:140px}
-.pzCard .who{display:flex;flex-direction:column;gap:5px;margin:12px 0 0;padding:12px;border-radius:12px;background:#f3e7d1}
-.pzCard .who label{font-weight:800;font-size:13.5px;color:#2a1d12;margin:0}.pzCard .who small{color:#7a5f45;font-size:12px}
-.pzCard .who input{width:120px;padding:8px 10px;border-radius:9px;border:2px solid #d8c8ae;background:#fffdf5;color:#2a1d12;font:800 20px ui-monospace,Menlo,monospace;letter-spacing:.2em;text-transform:uppercase}
 .pzCard .unlock{background:#fff1cf;border:1px dashed #d9a441;border-radius:10px;padding:8px 10px;font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .pzCard .unlock img{width:22px;height:22px}
 .rateHead{display:flex;gap:12px;align-items:center}.rateHead canvas{width:76px;height:76px;flex:none;border-radius:50%;background:#f1e4cc}
@@ -827,15 +824,8 @@ export function createPizzeria(ctx = {}) {
     modal(`<h2>Moore’s Pizzeria</h2><p><b>Day ${save.day}.</b> ${SHIFT} hungry customers are on their way. Every pie gets scored, so make them count.${save.best ? ` Your best shift so far: <b>${save.best} pts</b>.` : ''}</p>
       ${fresh.length ? `<div class="unlock">New today: ${fresh.map(k => `<img src="${ICONS[k]}" alt=""> ${T[k].name}`).join(' &nbsp;')}</div>` : ''}
       <ol>${HOWTO.slice(0, 5).map(h => `<li>${h}</li>`).join('')}</ol><p style="font-size:13px;color:#7a5f45">${HOWTO[5]}</p>
-      <form id="mWho" class="who"><label for="mIni">Your 3 initials for the leaderboard</label><input id="mIni" maxlength="3" value="${esc(ctx.player?.() || '')}" placeholder="AAA" autocomplete="off" autocapitalize="characters" spellcheck="false"><small>Your score posts automatically when the shift ends.</small></form>
       <div class="acts"><button class="pzBtn" id="mStart">Open the shop</button><button class="pzBtn ghost" style="color:#2a1d12;border-color:#d8c8ae" id="mLeave">Back to the kitchen</button></div>`);
-    const ini = $('#mIni');
-    const go = () => {
-      if (ctx.setPlayer && !ctx.setPlayer(ini.value)) { ini.value = ''; ini.placeholder = 'Use 3 letters or numbers'; ini.focus(); return; }
-      ini.blur(); closeModal(); G.running = true; sfx('bell');
-    };
-    $('#mStart').onclick = go; $('#mWho').onsubmit = e => { e.preventDefault(); go(); };
-    if (!ini.value) setTimeout(() => ini.focus(), 50);
+    $('#mStart').onclick = () => { closeModal(); G.running = true; sfx('bell'); };
     $('#mLeave').onclick = () => ctx.exit?.();
   }
   function pause() {
